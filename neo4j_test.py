@@ -50,16 +50,16 @@ from neo4j import GraphDatabase
 
 
 # g_ds_path = '/home/mf3jh/workspace/data/neo4j_test_data/arxiv-metadata-oai-snapshot.json'
-g_ds_path = '/home/mf3jh/workspace/data/epihipper/ak_contact_network_config_m_5_M_40_a_1000_m-contact_0_no_lid.txt'
-g_person_trait_path = '/home/mf3jh/workspace/data/epihipper/ak_persontrait_epihiper.txt'
+g_ds_path = None
+g_person_trait_path = None
 g_sample_cnt = 10
 
-g_neo4j_server_uri = 'neo4j://localhost:7687'
-g_neo4j_username = 'neo4j'
-g_neo4j_password = 'michal'
+g_neo4j_server_uri = None
+g_neo4j_username = None
+g_neo4j_password = None
 
 # g_neo4j_db_name = 'mysampledb'
-g_neo4j_db_name = 'samplecontactnetwork'
+g_neo4j_db_name = None
 
 
 def load_arxiv_samples(ds_path, num_rec):
