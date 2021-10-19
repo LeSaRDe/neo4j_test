@@ -51,6 +51,7 @@ from neo4j import GraphDatabase
 
 g_ds_path = None
 g_person_trait_path = None
+g_epihiper_output_path = None
 g_sample_cnt = 10000
 
 g_neo4j_server_uri = None
@@ -156,6 +157,31 @@ def load_person_trait(ds_path):
     df_person_trait = df_person_trait.set_index('pid')
     logging.debug('[load_person_trait] All done with %s records.' % len(df_person_trait))
     return df_person_trait
+
+
+def load_epihiper_output(ds_path):
+    logging.debug('[load_epihiper_output] Starts.')
+
+    l_rec = []
+    with open(ds_path, 'r') as in_fd:
+        csv_reader = csv.reader(in_fd, delimiter=',')
+        for row_idx, row in enumerate(csv_reader):
+            if row_idx == 0:
+                continue
+            else:
+                tick = int(row[0])
+                pid = int(row[1])
+                exit_state = row[2]
+                contact_pid = int(row[3])
+                if contact_pid == -1:
+                    contact_pid = None
+                lid = int(row[4])
+                if lid == -1:
+                    lid = None
+            l_rec.append((tick, pid, exit_state, contact_pid, lid))
+    df_output = pd.DataFrame(l_rec, columns=['tick', 'pid', 'exit_state', 'contact_pid', 'lid'])
+    logging.debug('[load_epihiper_output] All done with %s output records.' % len(df_output))
+    return df_output
 
 
 def connect_to_neo4j_driver(uri, auth, kwargs):
@@ -522,9 +548,9 @@ if __name__ == '__main__':
             logging.debug('Running time: %s' % str(time.time() - timer_start))
             logging.debug('[main] build_contact_network done.')
 
-        # QUERY INCOMING DEGREE DISTRIBUTION GROUPED BY age_group
-        elif cmd == 'in_deg_dist_by_age_group':
-            logging.debug('[main] in_deg_dist_by_age_group starts.')
+        # QUERY POPULATION DISTRIBUTION GROUPED BY age_group
+        elif cmd == 'population_dist_by_age_group':
+            logging.debug('[main] population_dist_by_age_group starts.')
             timer_start = time.time()
             neo4j_session_config = {'database': g_neo4j_db_name}
             query_str = '''match (n)
@@ -536,7 +562,7 @@ if __name__ == '__main__':
             ret = execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str], need_ret=True)
             print(ret)
             logging.debug('Running time: %s' % str(time.time() - timer_start))
-            logging.debug('[main] in_deg_dist_by_age_group done.')
+            logging.debug('[main] population_dist_by_age_group done.')
 
         # QUERY SOURCE ACTIVITY DISTRIBUTION
         elif cmd == 'src_act_dist':
@@ -553,5 +579,24 @@ if __name__ == '__main__':
             print(ret)
             logging.debug('Running time: %s' % str(time.time() - timer_start))
             logging.debug('[main] src_act_dist done.')
+
+        elif cmd == 'infect_in_deg_dist_at_t':
+            logging.debug('[main] infect_in_deg_dist_at_t starts.')
+            timer_start = time.time()
+            t = 14
+            neo4j_session_config = {'database': g_neo4j_db_name}
+            df_output = load_epihiper_output(g_epihiper_output_path)
+            df_output = df_output.set_index('tick')
+            l_infect_pid = list(set(df_output.loc[t]['pid'].to_list()))
+            logging.debug('Running time: %s' % str(time.time() - timer_start))
+            query_str = '''unwind $infect_pid as infect_pid
+                           match (n:PERSON {pid: infect_pid})
+                           return infect_pid, apoc.node.degree(n, "<CONTACT")'''
+            query_param = {'infect_pid': l_infect_pid}
+            ret = execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str], l_query_param=[query_param],
+                                        need_ret=True)
+            print([item for item in ret[0] if item['apoc.node.degree(n, "<CONTACT")'] > 0])
+            logging.debug('[main] infect_in_deg_dist_at_t done.')
+
 
     logging.debug('Finished.')
