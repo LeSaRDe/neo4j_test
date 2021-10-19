@@ -49,16 +49,14 @@ import pandas as pd
 from neo4j import GraphDatabase
 
 
-# g_ds_path = '/home/mf3jh/workspace/data/neo4j_test_data/arxiv-metadata-oai-snapshot.json'
 g_ds_path = None
 g_person_trait_path = None
-g_sample_cnt = 10
+g_sample_cnt = 10000
 
 g_neo4j_server_uri = None
 g_neo4j_username = None
 g_neo4j_password = None
 
-# g_neo4j_db_name = 'mysampledb'
 g_neo4j_db_name = None
 
 
@@ -270,7 +268,7 @@ def execute_neo4j_queries(neo4j_driver, neo4j_session_config, l_query_str, l_que
                     query_param = l_query_param[query_id]
                 results = neo4j_tx.run(query_str, query_param)
                 if need_ret:
-                    l_ret.append(results)
+                    l_ret.append(results.data())
             neo4j_tx.commit()
         neo4j_session.close()
     except Exception as e:
@@ -430,7 +428,7 @@ if __name__ == '__main__':
             logging.debug('[main] purge_db starts.')
             neo4j_session_config = {'database': g_neo4j_db_name}
             # Remove all data
-            query_str = '''match (s)-[r]->[t] delete r, s, t'''
+            query_str = '''match (s)-[r]->(t) delete r, s, t'''
             execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str])
             # Remove all constraints and some related indexes
             query_str = '''call apoc.schema.assert({}, {}, true)'''
@@ -524,6 +522,36 @@ if __name__ == '__main__':
             logging.debug('Running time: %s' % str(time.time() - timer_start))
             logging.debug('[main] build_contact_network done.')
 
+        # QUERY INCOMING DEGREE DISTRIBUTION GROUPED BY age_group
+        elif cmd == 'in_deg_dist_by_age_group':
+            logging.debug('[main] in_deg_dist_by_age_group starts.')
+            timer_start = time.time()
+            neo4j_session_config = {'database': g_neo4j_db_name}
+            query_str = '''match (n)
+                           with distinct n.age_group as age_group
+                           unwind age_group as each_age_group
+                           match (m)
+                           where m.age_group = each_age_group
+                           return each_age_group, count(m)'''
+            ret = execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str], need_ret=True)
+            print(ret)
+            logging.debug('Running time: %s' % str(time.time() - timer_start))
+            logging.debug('[main] in_deg_dist_by_age_group done.')
 
+        # QUERY SOURCE ACTIVITY DISTRIBUTION
+        elif cmd == 'src_act_dist':
+            logging.debug('[main] src_act_dist starts.')
+            timer_start = time.time()
+            neo4j_session_config = {'database': g_neo4j_db_name}
+            query_str = '''match ()-[r]->()
+                           with distinct r.src_act as src_act
+                           unwind src_act as each_src_act
+                           match ()-[q]->()
+                           where q.src_act = each_src_act
+                           return each_src_act, count(q)'''
+            ret = execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str], need_ret=True)
+            print(ret)
+            logging.debug('Running time: %s' % str(time.time() - timer_start))
+            logging.debug('[main] src_act_dist done.')
 
-    print('Done.')
+    logging.debug('Finished.')
