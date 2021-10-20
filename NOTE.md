@@ -136,7 +136,7 @@ This query returns all *relationships* (i.e. edges), labeled as "CONTACT", whose
 
 ## Potential Issues
 
-1. As Neo4j needs to store a lot of more meta-data of graph databases, the space consumption is non-trivial. We may need to pre-calculate the space consumption before deploying the server.
-2. Neo4j runs in JVM. It would be necessary to pre-calculate the memory consumption and set up the memory usage of JVM before starting the server.
+1. As Neo4j needs to store a lot of more meta-data of graph databases, the space consumption is non-trivial. We may need to pre-calculate the space consumption before deploying the server. Neo4j provides a tool to calculate space consumption: https://neo4j.com/hardware-sizing/ Here is a brief explanation by examples of how Neo4j stores data: https://neo4j.com/developer/kb/understanding-data-on-disk/
+2. Neo4j runs in JVM. It would be necessary to pre-calculate the memory consumption and set up the memory usage of JVM before starting the server. W.r.t. memory consumption, this article from Neo4j is helpful: https://neo4j.com/developer/kb/understanding-memory-consumption/
 3. Some core mechanisms of Neo4j such as execution planning, GC and indexing are also configurable depending on application scenarios. We may need to dig them deeply to understand what is the best practice.
 4. The performance of Graph Data Science Library (GDSL) is not fully understood yet. There may be some trade-off between directly utilizing GDSL and applying algorithms from other sources to have good performance.  
