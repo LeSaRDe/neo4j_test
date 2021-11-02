@@ -120,6 +120,10 @@ Efficiently adding nodes and edges into Neo4j graph database can be a tricky tas
 
 The third method may lead to different results from the first two. "**MERGE**" always searches for existing nodes or edges matching the given patterns. If found, then the user can choose what to do next, for example, updating the found nodes or edges. Otherwise, it will create a new node or edge. Thus, when constructing a multi-graph, "**MERGE**" may not behave as expected if not being used appropriately. On the other hand, "**CREATE**" will straightforwardly create nodes and edges regardless of the current graph, and each created node or edge will be assigned a unique ID. This unique ID is not controllable from the user end. 
 
+**!!!CAUTION!!!**
+
+When purging the Neo4j DB, "**DELETE**" can be very expensive on both time and memory. If we have to, "**DROP DATABASE**" may be a better option.
+
 ## Query Execution
 
 Each Cypher query will be decomposed into *operations*, and these operations will be organized into a tree-like structure which is called an **execution plan**. For example, consider the following query:
@@ -133,6 +137,10 @@ This query returns all *relationships* (i.e. edges), labeled as "CONTACT", whose
 ![](./execution_plan.png)
 
 *Figure 5.1 An example of execution plan.*
+
+**!!!CAUTION!!!**
+
+When retaining query results in Python, it is safer to use `neo4j.Result.values()` instead of `neo4j.Result.data()` because the latter function may miss some data (e.g. properties of edges) in its return. This could be a bug of the Python neo4j library. The key difference between these two functions is that the former one does not support named returned items but the latter does. 
 
 ## Potential Issues
 

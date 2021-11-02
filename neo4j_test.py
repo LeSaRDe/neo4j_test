@@ -48,6 +48,8 @@ import sqlite3
 from os import path
 
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 from neo4j import GraphDatabase
 import snap
 
@@ -310,7 +312,10 @@ def execute_neo4j_queries(neo4j_driver, neo4j_session_config, l_query_str, l_que
                     query_param = l_query_param[query_id]
                 results = neo4j_tx.run(query_str, query_param)
                 if need_ret:
-                    l_ret.append(results.data())
+                    # !!!CAUTION!!!
+                    # Here we need to use 'values()' function to retain the results instead of 'data()'
+                    # because 'data()' may miss some data in the results!
+                    l_ret.append(results.values())
             neo4j_tx.commit()
         neo4j_session.close()
     except Exception as e:
@@ -535,6 +540,8 @@ def create_epihiper_output_db():
 def load_epihiper_output_to_db(batch_size=10000):
     """
     Return True if successes, False otherwise.
+    TODO
+        It may look neater refactoring the DB connection and closure to 'with' statement.
     """
     print('[load_epihiper_output_to_db] Starts.')
     timer_start = time.time()
@@ -630,8 +637,242 @@ def create_indexes_on_epihipter_output_db():
         logging.error('[create_indexes_on_epihipter_output_db] Create indexes: %s' % e)
         return False
 
+    db_con.close()
     print('[create_indexes_on_epihipter_output_db] All done in %s secs.' % str(time.time() - timer_start))
     return True
+
+
+def fetch_pids_by_exit_state(exit_state):
+    """
+    Return the list of PIDs over time for a given exit state.
+    :return: pandas DataFrame
+        Index: tick (int)
+        Column: pid (list of int)
+    """
+    print('[fetch_pids_by_exit_state] Starts.')
+    timer_start = time.time()
+
+    try:
+        db_con = sqlite3.connect(g_epihiper_output_db_path)
+        db_cur = db_con.cursor()
+    except Exception as e:
+        logging.error(e)
+        return None
+
+    sql_str = '''select tick, pid from %s where exit_state="%s"''' \
+              % (g_epihiper_output_tb_name, exit_state)
+    try:
+        db_cur.execute(sql_str)
+        rows = db_cur.fetchall()
+    except Exception as e:
+        logging.error('[fetch_pids_by_exit_state] %s' % e)
+        return None
+
+    d_pid_by_tick = dict()
+    for row in rows:
+        tick = int(row[0])
+        pid = int(row[1])
+        if tick not in d_pid_by_tick:
+            d_pid_by_tick[tick] = [pid]
+        else:
+            d_pid_by_tick[tick].append(pid)
+
+    l_rec = []
+    for tick in d_pid_by_tick:
+        l_rec.append((tick, d_pid_by_tick[tick]))
+    df_pid_by_tick = pd.DataFrame(l_rec, columns=['tick', 'pid'])
+    df_pid_by_tick = df_pid_by_tick.set_index('tick')
+    pd.to_pickle(df_pid_by_tick, ''.join([g_epihiper_output_folder, 'output_pid_over_time_by_%s.pickle' % exit_state]))
+
+    db_con.close()
+    print('[fetch_pids_by_exit_state] All done in %s secs.' % str(time.time() - timer_start))
+    return df_pid_by_tick
+
+
+def duration_distribution(neo4j_driver, df_output_pid_over_time, out_name_suffix, l_t=None, mode='in_1nn'):
+    """
+    Get the duration distribution over a subgraph of contact network at time points specified by 'l_t'.
+    The subgraph is defined by 'mode'.
+    :param
+        df_output_pid_over_time: pandas DataFrame
+            Filtered PIDs over time. The subgraph is constructed starting from these PIDs.
+    :param
+        l_t: list of int
+            The given time points. '-1' means the initial contact graph.
+    :param
+        mode: str
+            'in_1nn': The subgraph is the 1-nearest-neighbor graph induced by incoming edges based on 'l_core_pids'.
+    :return: 2D ndarray
+        Dim 0: Durations sorted in the ascending order.
+        Dim 1: Counts of durations.
+    """
+    print('[duration_distribution] Starts.')
+    timer_start = time.time()
+
+    neo4j_session_config = {'database': g_neo4j_db_name}
+
+    if mode == 'in_1nn':
+        query_str = '''with $l_core_pid as l_core_pid, $tick as tick
+                       match (n:PERSON) where n.pid in l_core_pid
+                       match ()-[r:CONTACT]->(n) where r.occur = tick
+                       return r.duration as d
+                    '''
+
+    if l_t is None:
+        l_t = df_output_pid_over_time.index.to_list()
+
+    l_dist_rec = []
+    for tick, pid_rec in df_output_pid_over_time.loc[l_t].iterrows():
+        d_duration = dict()
+        l_core_pids = pid_rec['pid']
+        query_param = {'l_core_pid': l_core_pids, 'tick': tick}
+        l_ret = execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str], l_query_param=[query_param],
+                                      need_ret=True)
+        for rec in l_ret[0]:
+            duration = int(rec[0])
+            if duration not in d_duration:
+                d_duration[duration] = 1
+            else:
+                d_duration[duration] += 1
+        if len(d_duration) <= 0:
+            continue
+        l_dist_rec.append((tick, d_duration))
+
+    df_dist = pd.DataFrame(l_dist_rec, columns=['tick', 'duration_dist'])
+    df_dist = df_dist.set_index('tick')
+    pd.to_pickle(df_dist, ''.join([g_epihiper_output_folder, 'duration_dist_', out_name_suffix, '.pickle']))
+    print('[duration_distribution] Output results.')
+
+    # PLOT
+    fig, axes = plt.subplots(ncols=1, nrows=1)
+    d_draw = dict()
+    for tick, dist_rec in df_dist.iterrows():
+        d_dist = dist_rec['duration_dist']
+        l_duration = []
+        for duration in d_dist:
+            l_duration += [duration] * d_dist[duration]
+        d_draw['t' + str(tick)] = l_duration
+    sns.histplot(d_draw, multiple='stack', legend=True, ax=axes)
+    axes.set_title('Duration Distribution Over Time With Exit State %s' % out_name_suffix, fontsize=12,
+                   fontweight='semibold')
+    axes.set_xlabel('Duration', fontweight='semibold')
+    axes.set_ylabel('Frequency', fontweight='semibold')
+    plt.tight_layout(pad=1.0)
+    plt.savefig(''.join([g_epihiper_output_folder, 'duration_distribution_', out_name_suffix, '.PNG']), format='PNG')
+    plt.show()
+    plt.clf()
+    plt.close()
+
+    print('[duration_distribution] All done in %s secs.' % str(time.time() - timer_start))
+
+
+def add_node_to_snap_graph(tneanet_ins, pid, hid, age, age_group, gender, home_lat, home_lon, fips, admin1, admin2,
+                           admin3, admin4):
+    """
+    Each node is uniquely identified by its PID.
+    """
+    if tneanet_ins.IsNode(pid):
+        return tneanet_ins
+
+    tneanet_ins.AddNode(pid)
+    tneanet_ins.AddIntAttrDatN(pid, hid, 'hid')
+    tneanet_ins.AddIntAttrDatN(pid, age, 'age')
+    tneanet_ins.AddStrAttrDatN(pid, age_group, 'age_group')
+    tneanet_ins.AddIntAttrDatN(pid, gender, 'gender')
+    tneanet_ins.AddFltAttrDatN(pid, home_lat, 'home_lat')
+    tneanet_ins.AddFltAttrDatN(pid, home_lon, 'home_lon')
+    tneanet_ins.AddStrAttrDatN(pid, fips, 'fips')
+    tneanet_ins.AddStrAttrDatN(pid, admin1, 'admin1')
+    tneanet_ins.AddStrAttrDatN(pid, admin2, 'admin2')
+    tneanet_ins.AddStrAttrDatN(pid, admin3, 'admin3')
+    tneanet_ins.AddStrAttrDatN(pid, admin4, 'admin4')
+
+    return tneanet_ins
+
+
+def add_edge_to_snap_graph(tneanet_ins, src_pid, trg_pid, duration, src_act, trg_act, occur=None):
+    """
+    Multi-edges are supported.
+    """
+    eid = tneanet_ins.AddEdge(src_pid, trg_pid)
+    tneanet_ins.AddIntAttrDatE(eid, duration, 'duration')
+    tneanet_ins.AddStrAttrDatE(eid, src_act, 'src_act')
+    tneanet_ins.AddStrAttrDatE(eid, trg_act, 'trg_act')
+    if occur is not None:
+        tneanet_ins.AddIntAttrDatE(eid, occur, 'occur')
+
+    return tneanet_ins
+
+
+def output_in_1nn(neo4j_driver, df_output_pid_over_time, graph_name_suffix):
+    """
+
+    """
+    print('[output_in_1nn_by_exit_state] Starts.')
+    timer_start = time.time()
+
+    neo4j_session_config = {'database': g_neo4j_db_name}
+    query_str = '''with $l_core_pid as l_core_pid, $tick as tick
+                   match (t:PERSON) where t.pid in l_core_pid
+                   match (s:PERSON)-[r:CONTACT]->(t) where r.occur = tick
+                   return s, t, r
+                '''
+    for tick, pid_rec in df_output_pid_over_time.iterrows():
+        l_core_pids = pid_rec['pid']
+        query_param = {'l_core_pid': l_core_pids, 'tick': tick}
+        l_ret = execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str], l_query_param=[query_param],
+                                      need_ret=True)
+        if len(l_ret[0]) <= 0:
+            continue
+
+        tneanet_ins = snap.TNEANet.New()
+        for ret in l_ret[0]:
+            src = ret[0]
+            src_pid = int(src['pid'])
+            src_hid = int(src['hid'])
+            src_age = int(src['age'])
+            src_age_group = src['age_group']
+            src_gender = int(src['gender'])
+            src_home_lat = float(src['home_lat'])
+            src_home_lon = float(src['home_lon'])
+            src_fips = src['fips']
+            src_admin1 = src['admin1']
+            src_admin2 = src['admin2']
+            src_admin3 = src['admin3']
+            src_admin4 = src['admin4']
+            add_node_to_snap_graph(tneanet_ins, src_pid, src_hid, src_age, src_age_group, src_gender, src_home_lat,
+                                   src_home_lon, src_fips, src_admin1, src_admin2, src_admin3, src_admin4)
+
+            trg = ret[1]
+            trg_pid = int(trg['pid'])
+            trg_hid = int(trg['hid'])
+            trg_age = int(trg['age'])
+            trg_age_group = trg['age_group']
+            trg_gender = int(trg['gender'])
+            trg_home_lat = float(trg['home_lat'])
+            trg_home_lon = float(trg['home_lon'])
+            trg_fips = trg['fips']
+            trg_admin1 = trg['admin1']
+            trg_admin2 = trg['admin2']
+            trg_admin3 = trg['admin3']
+            trg_admin4 = trg['admin4']
+            add_node_to_snap_graph(tneanet_ins, trg_pid, trg_hid, trg_age, trg_age_group, trg_gender, trg_home_lat,
+                                   trg_home_lon, trg_fips, trg_admin1, trg_admin2, trg_admin3, trg_admin4)
+
+            edge = ret[2]
+            edge_duration = edge['duration']
+            edge_src_act = edge['src_act']
+            edge_trg_act = edge['trg_act']
+            add_edge_to_snap_graph(tneanet_ins, src_pid, trg_pid, edge_duration, edge_src_act, edge_trg_act)
+
+        fd_out = snap.TFOut(''.join([g_epihiper_output_folder, 'in_1nn_', graph_name_suffix,
+                                     '_%s.snap_graph' % str(tick)]))
+        tneanet_ins.Save(fd_out)
+        fd_out.Flush()
+        print('[output_in_1nn_by_exit_state] Output SNAP graph for tick %s with %s nodes and %s edges.'
+              % (tick, tneanet_ins.GetNodes(), tneanet_ins.GetEdges()))
+
+    print('[output_in_1nn_by_exit_state] All done in %s secs.' % str(time.time() - timer_start))
 
 
 if __name__ == '__main__':
@@ -645,6 +886,12 @@ if __name__ == '__main__':
     #   > python neo4j_test.py "neo4j_driver->build_init_cn"
     #   # CREATE INTERMEDIATE CONTACT NETWORKS
     #   > python neo4j_test.py "neo4j_driver->build_int_cn"
+    #   # CREATE EPIHIPER OUTPUT DATABASE
+    #   > python neo4j_test.py "create_epihiper_output_db->load_epihiper_output_data->create_epihiper_output_db_indexes"
+    #   # DURATION DISTRIBUTION W.R.T. EXIT STATE
+    #   > python neo4j_test.py "fetch_pids_by_exit_state->neo4j_driver->duration_distribution"
+    #   # OUTPUT IN-1NN SNAP GRAPHS FOR EXIT STATE
+    #   > python neo4j_test.py "neo4j_driver->output_in_1nn"
     #   NOTE
     #   1. All commands should be linked by '->'.
     #   2. The order of commands matters.
@@ -889,6 +1136,30 @@ if __name__ == '__main__':
             create_indexes_on_epihipter_output_db()
             print('[main] create_epihiper_output_db_indexes done.')
 
+        # FETCH PIDs OVER TIME FROM EPIHIPER OUTPUT DATABASE FOR A GIVEN EXIT STATE
+        elif cmd == 'fetch_pids_by_exit_state':
+            print('[main] fetch_pids_by_exit_state starts.')
+            exit_state = 'Isymp_s'
+            fetch_pids_by_exit_state(exit_state)
+            print('[main] fetch_pids_by_exit_state done.')
+
+        # COMPUTE DISTRIBUTION OF DURATION OVER TIME
+        elif cmd == 'duration_distribution':
+            print('[main] duration_distribution starts.')
+            exit_state = 'Isymp_s'
+            df_output_pid_over_time = pd.read_pickle(''.join([g_epihiper_output_folder,
+                                                              'output_pid_over_time_by_%s.pickle' % exit_state]))
+            duration_distribution(neo4j_driver, df_output_pid_over_time, exit_state)
+            print('[main] duration_distribution done.')
+
+        elif cmd == 'output_in_1nn':
+            print('[main] output_in_1nn starts.')
+            exit_state = 'Isymp_s'
+            df_output_pid_over_time = pd.read_pickle(''.join([g_epihiper_output_folder,
+                                                              'output_pid_over_time_by_%s.pickle' % exit_state]))
+            output_in_1nn(neo4j_driver, df_output_pid_over_time, exit_state)
+            print('[main] output_in_1nn done.')
+
         # QUERY POPULATION DISTRIBUTION GROUPED BY age_group
         elif cmd == 'population_dist_by_age_group':
             print('[main] population_dist_by_age_group starts.')
@@ -916,8 +1187,7 @@ if __name__ == '__main__':
                            match ()-[q]->()
                            where q.src_act = each_src_act
                            return each_src_act, count(q)'''
-            ret = execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str], need_ret=True)
-            print(ret)
+            execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str])
             print('Running time: %s' % str(time.time() - timer_start))
             print('[main] src_act_dist done.')
 
@@ -934,8 +1204,7 @@ if __name__ == '__main__':
                            match (n:PERSON {pid: infect_pid})
                            return infect_pid, apoc.node.degree(n, "<CONTACT")'''
             query_param = {'infect_pid': l_infect_pid}
-            ret = execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str], l_query_param=[query_param],
-                                        need_ret=True)
+            execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str], l_query_param=[query_param])
             print([item for item in ret[0] if item['apoc.node.degree(n, "<CONTACT")'] > 0])
             print('[main] infect_in_deg_dist_at_t done.')
 
