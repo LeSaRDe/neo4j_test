@@ -41,11 +41,13 @@ NOTE:
 import json
 import logging
 import csv
+import os
 import sys
 import time
 import math
 import sqlite3
-from os import path
+from os import path, walk
+import re
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -68,7 +70,7 @@ g_l_int_cn_path = [g_int_cn_path_fmt.format(str(i)) for i in range(g_int_cn_cnt)
 
 g_sample_cnt = None
 
-g_neo4j_server_uri = 'neo4j://localhost:7687'
+g_neo4j_server_uri_fmt = 'neo4j://{0}:7687'
 g_neo4j_username = 'neo4j'
 g_neo4j_password = 'michal'
 
@@ -499,6 +501,85 @@ def create_int_cn(neo4j_driver, int_cn_cnt, int_cn_batch_size=100000):
     print('[create_int_cn] All done. Running time: %s ' % str(time.time() - timer_start_init))
 
 
+def create_int_cn_auto_search(neo4j_driver, search_folder, int_cn_batch_size=1000000):
+    """
+    Search for intermediate files and load in.
+    """
+    print('[create_int_cn_auto_search] Starts.')
+
+    if not path.exists(search_folder):
+        logging.error('[create_int_cn_auto_search] search_folder %s does not exist.' % search_folder)
+        return None
+
+    int_cn_file_fmt = 'network\[\d+\]'
+
+    timer_start_init = time.time()
+    timer_start = time.time()
+
+    # CONFIGURE NEO4J SESSION
+    neo4j_session_config = {'database': g_neo4j_db_name}
+
+    # LOAD IN INTERMEDIATE CONTACT NETWORKS
+    # occur_time_stamp = -1
+    query_str_fmt = '''unwind $rec as rec
+                       match (src:PERSON), (trg:PERSON)
+                       where src.pid=rec.sourcePID and trg.pid=rec.targetPID
+                       create (src)-[r:CONTACT {occur: %s, src_act:rec.sourceActivity, trg_act:rec.targetActivity,
+                       duration:rec.duration}]->(trg)
+                    '''
+
+    for (dirpath, dirname, filenames) in walk(search_folder):
+        for filename in filenames:
+            if re.match(int_cn_file_fmt, filename) is None:
+                continue
+
+            l_num_str = re.findall(r'[0-9]+', filename)
+            if len(l_num_str) != 1:
+                logging.error('[create_int_cn_auto_search] Confusing file occurs: %s' % filename)
+                continue
+
+            int_cn_idx = int(l_num_str[0])
+
+            total_cnt_per_int_cn = 0
+            l_int_cn_batch = []
+            with open(path.join(dirpath, filename), 'r') as in_fd:
+                csv_reader = csv.reader(in_fd, delimiter=',')
+                for row_idx, row in enumerate(csv_reader):
+                    if row_idx == 0 or row_idx == 1:
+                        continue
+                    else:
+                        targetPID = int(row[0])
+                        targetActivity = row[1]
+                        sourcePID = int(row[2])
+                        sourceActivity = row[3]
+                        duration = int(row[4])
+                        l_int_cn_batch.append({'targetPID': targetPID,
+                                               'targetActivity': targetActivity,
+                                               'sourcePID': sourcePID,
+                                               'sourceActivity': sourceActivity,
+                                               'duration': duration})
+                    # CREATE EDGES FOR EACH BATCH
+                    if len(l_int_cn_batch) >= int_cn_batch_size:
+                        query_param = {'rec': l_int_cn_batch}
+                        execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str_fmt % str(int_cn_idx)],
+                                              l_query_param=[query_param])
+                        total_cnt_per_int_cn += len(l_int_cn_batch)
+                        l_int_cn_batch = []
+                        print('[create_int_cn_auto_search] Int CN %s: Created %s edges in %s secs.'
+                              % (int_cn_idx, total_cnt_per_int_cn, time.time() - timer_start))
+                if len(l_int_cn_batch) > 0:
+                    query_param = {'rec': l_int_cn_batch}
+                    execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str_fmt % str(int_cn_idx)],
+                                          l_query_param=[query_param])
+                    total_cnt_per_int_cn += len(l_int_cn_batch)
+                    print('[create_int_cn_auto_search] Int CN %s: Created %s edges in %s secs.'
+                          % (int_cn_idx, total_cnt_per_int_cn, time.time() - timer_start))
+                print('[create_int_cn_auto_search] Int CN %s: All done in %s secs.'
+                      % (int_cn_idx, time.time() - timer_start))
+
+    print('[create_int_cn_auto_search] All done. Running time: %s ' % str(time.time() - timer_start_init))
+
+
 def create_epihiper_output_db():
     """
     Return True if successes, False otherwise.
@@ -806,9 +887,10 @@ def add_edge_to_snap_graph(tneanet_ins, src_pid, trg_pid, duration, src_act, trg
 
 def output_in_1nn(neo4j_driver, df_output_pid_over_time, graph_name_suffix):
     """
-
+    Read in subsets of nodes over time specified by 'df_output_pid_over_time', and output TNEANet graph files for
+    the time points.
     """
-    print('[output_in_1nn_by_exit_state] Starts.')
+    print('[output_in_1nn] Starts.')
     timer_start = time.time()
 
     neo4j_session_config = {'database': g_neo4j_db_name}
@@ -866,13 +948,214 @@ def output_in_1nn(neo4j_driver, df_output_pid_over_time, graph_name_suffix):
             add_edge_to_snap_graph(tneanet_ins, src_pid, trg_pid, edge_duration, edge_src_act, edge_trg_act)
 
         fd_out = snap.TFOut(''.join([g_epihiper_output_folder, 'in_1nn_', graph_name_suffix,
-                                     '_%s.snap_graph' % str(tick)]))
+                                     '_t%s.snap_graph' % str(tick)]))
         tneanet_ins.Save(fd_out)
         fd_out.Flush()
-        print('[output_in_1nn_by_exit_state] Output SNAP graph for tick %s with %s nodes and %s edges.'
+        print('[output_in_1nn] Output SNAP graph for tick %s with %s nodes and %s edges.'
               % (tick, tneanet_ins.GetNodes(), tneanet_ins.GetEdges()))
 
-    print('[output_in_1nn_by_exit_state] All done in %s secs.' % str(time.time() - timer_start))
+    print('[output_in_1nn] All done in %s secs.' % str(time.time() - timer_start))
+
+
+def output_in_1nn_batch(neo4j_driver, df_output_pid_over_time, batch_size, graph_name_suffix):
+    print('[output_in_1nn_batch] Starts.')
+    timer_start = time.time()
+
+    neo4j_session_config = {'database': g_neo4j_db_name}
+    query_str_fmt = '''with $l_core_pid as l_core_pid, $tick as tick
+                       match (t:PERSON) where t.pid in l_core_pid
+                       match (s:PERSON)-[r:CONTACT]->(t) where r.occur = tick
+                       return s, t, r
+                       skip %s limit %s
+                    '''
+
+    for tick, pid_rec in df_output_pid_over_time.iterrows():
+        l_core_pids = pid_rec['pid']
+        query_param = {'l_core_pid': l_core_pids, 'tick': tick}
+        skip = 0
+        limit = batch_size
+        batch_cnt = 0
+        while True:
+            l_ret = execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str_fmt % (skip, limit)],
+                                          l_query_param=[query_param],
+                                          need_ret=True)
+            if len(l_ret[0]) <= 0:
+                print('[output_in_1nn_batch] Done graph output with %s batches for tick %s' % (batch_cnt, tick))
+                break
+
+            tneanet_ins = snap.TNEANet.New()
+            for ret in l_ret[0]:
+                src = ret[0]
+                src_pid = int(src['pid'])
+                src_hid = int(src['hid'])
+                src_age = int(src['age'])
+                src_age_group = src['age_group']
+                src_gender = int(src['gender'])
+                src_home_lat = float(src['home_lat'])
+                src_home_lon = float(src['home_lon'])
+                src_fips = src['fips']
+                src_admin1 = src['admin1']
+                src_admin2 = src['admin2']
+                src_admin3 = src['admin3']
+                src_admin4 = src['admin4']
+                add_node_to_snap_graph(tneanet_ins, src_pid, src_hid, src_age, src_age_group, src_gender, src_home_lat,
+                                       src_home_lon, src_fips, src_admin1, src_admin2, src_admin3, src_admin4)
+
+                trg = ret[1]
+                trg_pid = int(trg['pid'])
+                trg_hid = int(trg['hid'])
+                trg_age = int(trg['age'])
+                trg_age_group = trg['age_group']
+                trg_gender = int(trg['gender'])
+                trg_home_lat = float(trg['home_lat'])
+                trg_home_lon = float(trg['home_lon'])
+                trg_fips = trg['fips']
+                trg_admin1 = trg['admin1']
+                trg_admin2 = trg['admin2']
+                trg_admin3 = trg['admin3']
+                trg_admin4 = trg['admin4']
+                add_node_to_snap_graph(tneanet_ins, trg_pid, trg_hid, trg_age, trg_age_group, trg_gender, trg_home_lat,
+                                       trg_home_lon, trg_fips, trg_admin1, trg_admin2, trg_admin3, trg_admin4)
+
+                edge = ret[2]
+                edge_duration = edge['duration']
+                edge_src_act = edge['src_act']
+                edge_trg_act = edge['trg_act']
+                add_edge_to_snap_graph(tneanet_ins, src_pid, trg_pid, edge_duration, edge_src_act, edge_trg_act)
+
+            fd_out = snap.TFOut(''.join([g_epihiper_output_folder, 'in_1nn_', graph_name_suffix,
+                                         '_t%s_%s.snap_graph' % (tick, batch_cnt)]))
+            tneanet_ins.Save(fd_out)
+            fd_out.Flush()
+
+            context = snap.TTableContext()
+            node_ttable = snap.TTable.GetNodeTable(tneanet_ins, context)
+            edge_ttable = snap.TTable.GetEdgeTable(tneanet_ins, context)
+
+            fd_out = snap.TFOut(''.join([g_epihiper_output_folder, 'node_ttable_%s_t%s_%s.bin'
+                                         % (graph_name_suffix, tick, batch_cnt)]))
+            node_ttable.Save(fd_out)
+            fd_out.Flush()
+            fd_out = snap.TFOut(''.join([g_epihiper_output_folder, 'edge_ttable_%s_t%s_%s.bin'
+                                         % (graph_name_suffix, tick, batch_cnt)]))
+            edge_ttable.Save(fd_out)
+            fd_out.Flush()
+
+            print('[output_in_1nn_batch] Output SNAP graph for tick %s on offset %s and batch size %s with %s nodes and %s edges.'
+                  % (tick, skip, len(l_ret[0]), tneanet_ins.GetNodes(), tneanet_ins.GetEdges()))
+            skip += limit
+            batch_cnt += 1
+
+    print('[output_in_1nn_batch] All done in %s secs.' % str(time.time() - timer_start))
+
+
+def output_in_1nn_ttables_from_tneanet(tneanet_file_path, graph_name_suffix):
+    print('[output_in_1nn_ttables_from_tneanet] Starts.')
+    timer_start = time.time()
+
+    fd_in = snap.TFIn(tneanet_file_path)
+    tneanet_ins = snap.TNEANet.Load(fd_in)
+
+    context = snap.TTableContext()
+    node_ttable = snap.TTable.GetNodeTable(tneanet_ins, context)
+    edge_ttable = snap.TTable.GetEdgeTable(tneanet_ins, context)
+
+    fd_out = snap.TFOut(''.join([g_epihiper_output_folder, 'node_ttable_%s.bin' % graph_name_suffix]))
+    node_ttable.Save(fd_out)
+    fd_out.Flush()
+    fd_out = snap.TFOut(''.join([g_epihiper_output_folder, 'edge_ttable_%s.bin' % graph_name_suffix]))
+    edge_ttable.Save(fd_out)
+    fd_out.Flush()
+    print('[output_in_1nn_ttables_from_tneanet] All done for %s in %s secs.'
+          % (graph_name_suffix, time.time() - timer_start))
+
+
+def output_in_1nn_ttables(neo4j_driver, df_output_pid_over_time, graph_name_suffix):
+    """
+    Read in subsets of nodes over time specified by 'df_output_pid_over_time', and output TTable files (including
+    a node table and an edge table for each graph) for the time points.
+    TODO
+        SNAP does not support converting a TNEANet graph to TTables directly. So we take the query output from Neo4j,
+        and output a CSV file for nodes and another CSV file for edges. Then we load in the CSV files for nodes and
+        edges, and output them as TTable files respectively.
+        Can we make this easier?
+    !!!CAUTION!!!
+        Seems that SNAP 6.0 has some bugs in loading in CSV files and constructing TTables. The attributes in a CSV
+        file cannot be all integer type. Otherwise, it fails. See issue here:
+        https://github.com/NSSAC/EpiHiper-network_analytics/issues/3
+    """
+    print('[output_in_1nn_ttables] Starts.')
+    timer_start = time.time()
+
+    neo4j_session_config = {'database': g_neo4j_db_name}
+    query_str = '''with $l_core_pid as l_core_pid, $tick as tick
+                   match (t:PERSON) where t.pid in l_core_pid
+                   match (s:PERSON)-[r:CONTACT]->(t) where r.occur = tick
+                   return s, t, r
+                '''
+    node_attr = ['pid', 'hid', 'age', 'age_group', 'gender', 'home_lat', 'home_lon', 'fips', 'admin1', 'admin2',
+                 'admin3', 'admin4']
+    edge_attr = ['duration', 'src_act', 'trg_act']
+
+    edgeschema = snap.Schema()
+    edgeschema.Add(snap.TStrTAttrPr("duration", snap.atInt))
+    edgeschema.Add(snap.TStrTAttrPr("src_act", snap.atStr))
+    edgeschema.Add(snap.TStrTAttrPr("trg_act", snap.atStr))
+
+    nodeschema = snap.Schema()
+    nodeschema.Add(snap.TStrTAttrPr("pid", snap.atInt))
+    nodeschema.Add(snap.TStrTAttrPr("hid", snap.atInt))
+    nodeschema.Add(snap.TStrTAttrPr("age", snap.atInt))
+    nodeschema.Add(snap.TStrTAttrPr("age_group", snap.atStr))
+    nodeschema.Add(snap.TStrTAttrPr("gender", snap.atInt))
+    nodeschema.Add(snap.TStrTAttrPr("home_lat", snap.atFlt))
+    nodeschema.Add(snap.TStrTAttrPr("home_lon", snap.atFlt))
+    nodeschema.Add(snap.TStrTAttrPr("fips", snap.atStr))
+    nodeschema.Add(snap.TStrTAttrPr("admin1", snap.atStr))
+    nodeschema.Add(snap.TStrTAttrPr("admin2", snap.atStr))
+    nodeschema.Add(snap.TStrTAttrPr("admin3", snap.atStr))
+    nodeschema.Add(snap.TStrTAttrPr("admin4", snap.atStr))
+
+    for tick, pid_rec in df_output_pid_over_time.iterrows():
+        l_core_pids = pid_rec['pid']
+        query_param = {'l_core_pid': l_core_pids, 'tick': tick}
+        l_ret = execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str], l_query_param=[query_param],
+                                      need_ret=True)
+        if len(l_ret[0]) <= 0:
+            continue
+
+        node_csv_file_name = ''.join([g_epihiper_output_folder, 'tmp_node_%s_%s.csv' % (graph_name_suffix, tick)])
+        l_node_rec = [ret[0] for ret in l_ret[0]] + [ret[1] for ret in l_ret[0]]
+        df_node = pd.DataFrame(l_node_rec)
+        df_node.drop_duplicates(subset=['pid'], inplace=True)
+        df_node.to_csv(node_csv_file_name, columns=node_attr, index=False)
+        print('[output_in_1nn_ttables] Output node CSV for tick %s' % str(tick))
+
+        edge_csv_file_name = ''.join([g_epihiper_output_folder, 'tmp_edge_%s_%s.csv' % (graph_name_suffix, tick)])
+        l_edge_rec = [ret[2] for ret in l_ret[0]]
+        df_edge = pd.DataFrame(l_edge_rec)
+        df_edge.to_csv(edge_csv_file_name, columns=edge_attr, index=False)
+        print('[output_in_1nn_ttables] Output edge CSV for tick %s' % str(tick))
+
+        context = snap.TTableContext()
+        node_ttable = snap.TTable.LoadSS(nodeschema, node_csv_file_name, context, ",", snap.TBool(True))
+        edge_ttable = snap.TTable.LoadSS(edgeschema, edge_csv_file_name, context, ",", snap.TBool(True))
+
+        os.remove(node_csv_file_name)
+        os.remove(edge_csv_file_name)
+
+        node_ttable_file_name = ''.join([g_epihiper_output_folder, 'node_ttable_%s_%s.bin' % (graph_name_suffix, tick)])
+        edge_ttable_file_name = ''.join([g_epihiper_output_folder, 'edge_ttable_%s_%s.bin' % (graph_name_suffix, tick)])
+        fd_out = snap.TFOut(node_ttable_file_name)
+        node_ttable.Save(fd_out)
+        fd_out.Flush()
+        fd_out = snap.TFOut(edge_ttable_file_name)
+        edge_ttable.Save(fd_out)
+        fd_out.Flush()
+
+        print('[output_in_1nn_ttables] Output node and edge TTables for tick %s in %s secs.'
+              % (tick, time.time() - timer_start))
+    print('[output_in_1nn_ttables] All done in %s secs.' % str(time.time() - timer_start))
 
 
 if __name__ == '__main__':
@@ -892,11 +1175,18 @@ if __name__ == '__main__':
     #   > python neo4j_test.py "fetch_pids_by_exit_state->neo4j_driver->duration_distribution"
     #   # OUTPUT IN-1NN SNAP GRAPHS FOR EXIT STATE
     #   > python neo4j_test.py "neo4j_driver->output_in_1nn"
+    #   # OUTPUT IN-1NN NODE AND EDGE TTABLES FOR EXIT STATE
+    #   > python neo4j_test.py "neo4j_driver->output_in_1nn_ttables"
+    #   # OUTPUT IN-1NN NODE AND EDGE TTABLES FOR EXIT STATE FROM TNEANET
+    #   > python neo4j_test.py "output_in_1nn_ttables_from_tneanet"
     #   NOTE
     #   1. All commands should be linked by '->'.
     #   2. The order of commands matters.
     ############################################################
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.ERROR)
+
+    neo4j_hostname = sys.argv[1]
+    g_neo4j_server_uri = g_neo4j_server_uri_fmt.format(neo4j_hostname)
 
     if g_neo4j_server_uri is None:
         print('[main] Please set Neo4j server URI to "g_neo4j_server_uri".')
@@ -907,7 +1197,7 @@ if __name__ == '__main__':
     if g_neo4j_db_name is None:
         print('[main] Please set DB name to "g_neo4j_db_name".')
 
-    cmd_pipeline = sys.argv[1]
+    cmd_pipeline = sys.argv[2]
     l_cmd = [cmd.strip().lower() for cmd in cmd_pipeline.split('->')]
     print('[main] Commands to be executed: %s' % l_cmd)
 
@@ -1118,6 +1408,12 @@ if __name__ == '__main__':
             create_int_cn(neo4j_driver, int_cn_cnt)
             print('[main] build_int_cn done.')
 
+        elif cmd == 'build_int_cn_auto_search':
+            print('[main] build_int_cn_auto_search starts.')
+            search_folder = g_epihiper_output_folder
+            create_int_cn_auto_search(neo4j_driver, search_folder, int_cn_batch_size=1000000)
+            print('[main] build_int_cn_auto_search done.')
+
         # CREATE EPIHIPER OUTPUT SQLITE DATABASE
         elif cmd == 'create_epihiper_output_db':
             print('[main] create_epihiper_output_db starts.')
@@ -1152,6 +1448,7 @@ if __name__ == '__main__':
             duration_distribution(neo4j_driver, df_output_pid_over_time, exit_state)
             print('[main] duration_distribution done.')
 
+        # OUTPUT TNEANET GRAPHS TO FILES
         elif cmd == 'output_in_1nn':
             print('[main] output_in_1nn starts.')
             exit_state = 'Isymp_s'
@@ -1159,6 +1456,35 @@ if __name__ == '__main__':
                                                               'output_pid_over_time_by_%s.pickle' % exit_state]))
             output_in_1nn(neo4j_driver, df_output_pid_over_time, exit_state)
             print('[main] output_in_1nn done.')
+
+        # OUTPUT BATCHED TNEANET GRAPHS TO FILES
+        elif cmd == 'output_in_1nn_batch':
+            print('[main] output_in_1nn_batch starts.')
+            exit_state = 'Isymp_s'
+            df_output_pid_over_time = pd.read_pickle(''.join([g_epihiper_output_folder,
+                                                              'output_pid_over_time_by_%s.pickle' % exit_state]))
+            batch_size = 100
+            output_in_1nn_batch(neo4j_driver, df_output_pid_over_time, batch_size, exit_state)
+            print('[main] output_in_1nn done.')
+
+        # OUTPUT TTABLES FOR NODES AND EDGES
+        elif cmd == 'output_in_1nn_ttables':
+            print('[main] output_in_1nn_ttables starts.')
+            exit_state = 'Isymp_s'
+            df_output_pid_over_time = pd.read_pickle(''.join([g_epihiper_output_folder,
+                                                              'output_pid_over_time_by_%s.pickle' % exit_state]))
+            output_in_1nn_ttables(neo4j_driver, df_output_pid_over_time, exit_state)
+            print('[main] output_in_1nn_ttables done.')
+
+        # OUTPUT TTABLES FOR NODES AND EDGES FROM TNEANET INSTANCE
+        elif cmd == 'output_in_1nn_ttables_from_tneanet':
+            print('[main] output_in_1nn_ttables_from_tneanet starts.')
+            exit_state = 'Isymp_s'
+            for tick in [5, 6, 7, 8, 9]:
+                graph_name_suffix = '%s_t%s' % (exit_state, tick)
+                tneanet_file_path = ''.join([g_epihiper_output_folder, 'in_1nn_%s.snap_graph' % graph_name_suffix])
+                output_in_1nn_ttables_from_tneanet(tneanet_file_path, graph_name_suffix)
+            print('[main] output_in_1nn_ttables_from_tneanet done.')
 
         # QUERY POPULATION DISTRIBUTION GROUPED BY age_group
         elif cmd == 'population_dist_by_age_group':

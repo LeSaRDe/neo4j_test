@@ -1,0 +1,21 @@
+Bootstrap: docker
+From: neo4j:enterprise
+
+%setup
+mkdir -p $SINGULARITY_ROOTFS/input
+mkdir -p $SINGULARITY_ROOTFS/output
+mkdir -p $SINGULARITY_ROOTFS/job
+mkdir -p $SINGULARITY_ROOTFS/data
+
+%post
+chmod -R 777 /var/lib/neo4j
+echo "dbms.directories.data=/data" >> /var/lib/neo4j/conf/neo4j.conf
+echo "dbms.directories.transaction.logs.root=/data/transactions" >> /var/lib/neo4j/conf/neo4j.conf
+echo "dbms.connector.bolt.listen_address=0.0.0.0" >> /var/lib/neo4j/conf/neo4j.conf
+echo "dbms.connector.https.listen_address=0.0.0.0" >> /var/lib/neo4j/conf/neo4j.conf
+echo "dbms.connector.http.listen_address=0.0.0.0" >> /var/lib/neo4j/conf/neo4j.conf
+echo "dbms.security.procedures.unrestricted=my.extensions.example,my.procedures.*,apoc.*" >> /var/lib/neo4j/conf/neo4j.conf
+echo "dbms.security.procedures.allowlist=apoc.coll.*,apoc.load.*,gds.*,apoc.*" >> /var/lib/neo4j/conf/neo4j.conf
+
+%startscript
+tini -s -g -- /docker-entrypoint.sh neo4j

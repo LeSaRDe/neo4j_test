@@ -1,6 +1,6 @@
 """
 NOTE
-    1. Data Structure for Contact Networks Stored in Neo4j
+    Data Structure for Contact Networks Stored in Neo4j
         Node Properties:
             pid: (int) Person ID (unique)
             hid: (int) Household ID
@@ -19,41 +19,11 @@ NOTE
             duration: (int) Contact by second
             src_act: (str) Source Activity
             trg_act: (str) Target Activity
-
-    2. Data Structure for Node and Edge TTables
-        Node:
-            Hidden ID:
-                node_id: (int) Unique ID for nodes, same as the 'pid' attribute.
-            Attibutes:
-                pid: (int) Person ID
-                hid: (int) Household ID
-                age: (int) Age
-                age_group: (str) One of ['p' (0-4), 's' (5-17), 'a' (18-49), 'o' (50-64), 'g' (65+)]
-                gender: (int) 1 or 2
-                fips: (str)
-                home_lat: (float) Home latitude
-                home_lon: (float) Home longitude
-                admin1: (str)
-                admin2: (str)
-                admin3: (str)
-                admin4: (str)
-        Edge:
-            Hidden ID:
-                edg_id: (int) Unique ID for edges. Note that 'edg_id' is literally in this exact string!
-            Hidden Attributes:
-                src_id: (int) ID for the source node.
-                dst_id: (int) ID for the destination nodes.
-            Attributes:
-                occur: (int) Occurrence time stamp for this edge (-1 means the initial)
-                duration: (int) Contact by second
-                src_act: (str) Source Activity
-                trg_act: (str) Target Activity
 """
 
 import logging
 import csv
 import sys
-import time
 import numpy as np
 
 

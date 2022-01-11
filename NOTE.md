@@ -142,9 +142,74 @@ This query returns all *relationships* (i.e. edges), labeled as "CONTACT", whose
 
 When retaining query results in Python, it is safer to use `neo4j.Result.values()` instead of `neo4j.Result.data()` because the latter function may miss some data (e.g. properties of edges) in its return. This could be a bug of the Python neo4j library. The key difference between these two functions is that the former one does not support named returned items but the latter does. 
 
+**!!!CAUTION!!!**
+
+When committing nodes or edges to Neo4j, batching is necessary. If a commit contains too many records, this commit may not fail but it may happen that nothing is added to Neo4j. 
+
+## Using Docker
+
+To start a Neoj4 server instance with Docker on Rivanna, we firstly need to enter the folder `/project/biocomplexity/mf3jh`, and then run the following command:
+
+```bash
+singularity instance start --env=NEO4J_ACCEPT_LICENSE_AGREEMENT=yes --writable-tmpfs  --bind neo4j_data:/project/biocomplexity/mf3jh /project/biocomplexity/singularity_images/neo4j-enterprise.sif neo4j
+```
+
+Notice that the folder we are at running the command need to be consistent with the folder specified by the `--bind` parameter, otherwise it will fail. To stop the Neo4j instance, we run the following command:
+
+```
+singularity instance stop neo4j
+```
+
+
+
 ## Potential Issues
 
 1. As Neo4j needs to store a lot of more meta-data of graph databases, the space consumption is non-trivial. We may need to pre-calculate the space consumption before deploying the server. Neo4j provides a tool to calculate space consumption: https://neo4j.com/hardware-sizing/ Here is a brief explanation by examples of how Neo4j stores data: https://neo4j.com/developer/kb/understanding-data-on-disk/
 2. Neo4j runs in JVM. It would be necessary to pre-calculate the memory consumption and set up the memory usage of JVM before starting the server. W.r.t. memory consumption, this article from Neo4j is helpful: https://neo4j.com/developer/kb/understanding-memory-consumption/
 3. Some core mechanisms of Neo4j such as execution planning, GC and indexing are also configurable depending on application scenarios. We may need to dig them deeply to understand what is the best practice.
 4. The performance of Graph Data Science Library (GDSL) is not fully understood yet. There may be some trade-off between directly utilizing GDSL and applying algorithms from other sources to have good performance.  
+
+
+
+## Better Practice
+
+1. Add these to settings:
+
+   ```
+   apoc.import.file.enabled=true
+   
+   dbms.memory.heap.initial_size=31g
+   dbms.memory.heap.max_size=31g
+   
+   dbms.memory.pagecache.size=80g
+   ```
+
+2. Import PERSON nodes:
+
+   ```
+   CALL apoc.periodic.iterate("CALL apoc.load.csv('file:///import/person_trait.csv') yield map as rec return rec","create (n:PERSON {pid: rec.pid, hid: rec.hid, age: rec.age, age_group: rec.age_group, 
+   gender: rec.gender, fips: rec.fips, home_lat: rec.home_lat, home_lon: rec.home_lon, 
+   admin1: rec.admin1, admin2: rec.admin2, admin3: rec.admin3, admin4: rec.admin4})",{parallel:true,batchSize:100000,concurrency:6})
+   ```
+
+3. Import Initial Contact Network
+
+    ```
+    xsv sort initial_network.csv > initial_network_sorted.csv
+```
+    
+```
+    CALL apoc.periodic.iterate("CALL apoc.load.csv('file:///import/initial_network_sorted.csv') yield map as rec return rec",
+    "match (src:PERSON), (trg:PERSON) where src.pid=rec.sourcePID and trg.pid=rec.targetPID create (src)-[r:CONTACT {occur: -1, src_act:rec.sourceActivity, trg_act:rec.targetActivity, duration:rec.duration}]->(trg)",
+{parallel:true,batchSize:200000,concurrency:4})
+```
+
+4. Import Intermediate Network
+
+   ```
+   CALL apoc.periodic.iterate("CALL apoc.load.csv('file:///import/intermediate_network_0_sorted.csv') yield map as rec return rec",
+   "match (src:PERSON), (trg:PERSON) where src.pid=rec.sourcePID and trg.pid=rec.targetPID create (src)-[r:CONTACT {occur: 0, src_act:rec.sourceActivity, trg_act:rec.targetActivity, duration:rec.duration}]->(trg)",
+   {parallel:true,batchSize:200000,concurrency:4})
+   ```
+
+   

@@ -50,20 +50,20 @@ NOTE
                 trg_act: (str) Target Activity
 """
 
-import json
+# import json
 import logging
 import csv
 import os
 import sys
 import time
-import math
-import sqlite3
+# import math
+# import sqlite3
 from os import path, walk
 import re
 
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+# import pandas as pd
+# import matplotlib.pyplot as plt
+# import seaborn as sns
 from neo4j import GraphDatabase
 import snap
 

@@ -81,11 +81,22 @@ def TNEANet_test_io():
     TNEANet_test_in_memory(tneanet_ins)
 
 
+def TNEANet_to_TTables_test():
+    tneanet_ins = TNEANet_graph_creation_test()
+
+    context = snap.TTableContext()
+    node_ttable = snap.TTable.GetNodeTable(tneanet_ins, context)
+    edge_ttable = snap.TTable.GetEdgeTable(tneanet_ins, context)
+
+    print()
+
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
-    tneanet_ins = TNEANet_graph_creation_test()
-    TNEANet_test_in_memory(tneanet_ins)
-    TNEANet_test_io()
+    # tneanet_ins = TNEANet_graph_creation_test()
+    # TNEANet_test_in_memory(tneanet_ins)
+    # TNEANet_test_io()
+    TNEANet_to_TTables_test()
 
     print('Done.')
