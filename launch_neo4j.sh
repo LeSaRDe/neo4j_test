@@ -74,12 +74,14 @@ EN_METRICS_EXP=false
 EXP_DATA=${WORK_FOLDER}data
 EXP_PLUGINS=${WORK_FOLDER}plugins
 EXP_LOGS=${WORK_FOLDER}logs
+EXP_IMPORT=${WORK_FOLDER}import
 EXP_CONF=${WORK_FOLDER}conf
 EXP_METRICS=${WORK_FOLDER}metrics
 
 mkdir -p ${EXP_DATA}
 mkdir -p ${EXP_PLUGINS}
 mkdir -p ${EXP_LOGS}
+mkdir -p ${EXP_IMPORT}
 if [ ${EN_CONF_EXP} = true ]
   then
     mkdir -p ${EXP_CONF}
@@ -92,6 +94,7 @@ fi
 chmod -R 777 ${EXP_DATA}
 chmod -R 777 ${EXP_PLUGINS}
 chmod -R 777 ${EXP_LOGS}
+chmod -R 777 ${EXP_IMPORT}
 if [ ${EN_CONF_EXP} = true ]
   then
     chmod -R 777 ${EXP_CONF}
@@ -107,11 +110,12 @@ NEO4J_DEF_FOLDER=/var/lib/neo4j/
 NEO4J_DEF_DATA=${NEO4J_DEF_FOLDER}data
 NEO4J_DEF_LOGS=${NEO4J_DEF_FOLDER}logs
 NEO4J_DEF_PLUGINS=${NEO4J_DEF_FOLDER}plugins
+NEO4J_DEF_IMPORT=${NEO4J_DEF_FOLDER}import
 NEO4J_DEF_CONF=${NEO4J_DEF_FOLDER}conf
 NEO4J_DEF_METRICS=${NEO4J_DEF_FOLDER}metrics
 
 # Folder Exposure Arguments
-FOLDER_EXP_ARG="${EXP_DATA}:${NEO4J_DEF_DATA},${EXP_PLUGINS}:${NEO4J_DEF_PLUGINS},${EXP_LOGS}:${NEO4J_DEF_LOGS}"
+FOLDER_EXP_ARG="${EXP_DATA}:${NEO4J_DEF_DATA},${EXP_PLUGINS}:${NEO4J_DEF_PLUGINS},${EXP_LOGS}:${NEO4J_DEF_LOGS},${EXP_IMPORT}:${NEO4J_DEF_IMPORT}"
 if [ ${EN_CONF_EXP} = true ]
   then
     FOLDER_EXP_ARG+="${EXP_CONF}:${NEO4J_DEF_CONF}"
@@ -124,6 +128,7 @@ fi
 echo "[RUN NEO4J] Data folder: ${NEO4J_DEF_DATA} => ${EXP_DATA}"
 echo "[RUN NEO4J] Plugin folder: ${NEO4J_DEF_PLUGINS} => ${EXP_PLUGINS}"
 echo "[RUN NEO4J] Log folder: ${NEO4J_DEF_LOGS} => ${EXP_LOGS}"
+echo "[RUN NEO4J] Log folder: ${NEO4J_DEF_IMPORT} => ${EXP_IMPORT}"
 if [ ${EN_CONF_EXP} = true ]
   then
     echo "[RUN NEO4J] Config folder: ${NEO4J_DEF_CONF} => ${EXP_CONF}"
