@@ -12,7 +12,7 @@ if [ "$#" -lt 1 ]
 fi
 
 # SET NEO4J SIF IMAGE PATH
-NEO4J_SIF=$2
+NEO4J_SIF=$1
 if [ ! -f ${NEO4J_SIF} ]
   then
     echo "[RUN CYPHER-SHELL] NEO4J SIG IMAGE: ${NEO4J_SIF} dose not exist!"
