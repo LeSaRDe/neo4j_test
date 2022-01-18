@@ -3,10 +3,11 @@
 #SBATCH --time=3-00:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=350000
-#SBATCH --partition=bii
+#SBATCH --partition=bii-gpu
 #SBATCH --exclusive
 #SBATCH --cpus-per-task=20
 #SBTACH --core-spec=40
+#SBATCH --gres=gpu:v100:4
 
 module load anaconda
 module load singularity
