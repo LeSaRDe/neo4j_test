@@ -829,6 +829,31 @@ def create_indexes_on_epihipter_output_db():
     return True
 
 
+def load_epihiper_output(ds_path):
+    logging.critical('[load_epihiper_output] Starts.')
+
+    l_rec = []
+    with open(ds_path, 'r') as in_fd:
+        csv_reader = csv.reader(in_fd, delimiter=',')
+        for row_idx, row in enumerate(csv_reader):
+            if row_idx == 0:
+                continue
+            else:
+                tick = int(row[0])
+                pid = int(row[1])
+                exit_state = row[2]
+                contact_pid = int(row[3])
+                if contact_pid == -1:
+                    contact_pid = None
+                lid = int(row[4])
+                if lid == -1:
+                    lid = None
+            l_rec.append((tick, pid, exit_state, contact_pid, lid))
+    df_output = pd.DataFrame(l_rec, columns=['tick', 'pid', 'exit_state', 'contact_pid', 'lid'])
+    logging.critical('[load_epihiper_output] All done with %s output records.' % len(df_output))
+    return df_output
+
+
 def fetch_pids_by_exit_state(exit_state, out_path):
     """
     Return the list of PIDs over time for a given exit state.
@@ -1389,6 +1414,27 @@ if __name__ == '__main__':
             out_folder = path.join(g_epihiper_output_folder, g_int_cn_folder)
             output_in_1nn_batch(neo4j_driver, df_output_pid_over_time, batch_size, out_folder, exit_state)
             logging.critical('[main] output_in_1nn done.')
+
+        # QUERY INCOMING DEGREES OF INFECTED PEOPLE
+        elif cmd == 'infect_in_deg_dist_at_t':
+            logging.critical('[main] infect_in_deg_dist_at_t starts.')
+            timer_start = time.time()
+            t = 5
+            neo4j_session_config = {'database': g_neo4j_db_name}
+            df_output = load_epihiper_output(g_epihiper_output_path)
+            df_output = df_output.set_index('tick')
+            l_infect_pid = list(set(df_output.loc[t]['pid'].to_list()))
+            logging.critical('Running time: %s' % str(time.time() - timer_start))
+            query_str = '''unwind $infect_pid as infect_pid
+                           match (n:PERSON {pid: infect_pid})
+                           return infect_pid, apoc.node.degree(n, "<CONTACT")'''
+            query_param = {'infect_pid': l_infect_pid}
+            ret = execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str], l_query_param=[query_param],
+                                        need_ret=True)
+            logging.critical('return:')
+            logging.critical(ret[0])
+            # logging.critical([item for item in ret[0] if item['apoc.node.degree(n, "<CONTACT")'] > 0])
+            logging.critical('[main] infect_in_deg_dist_at_t done.')
 
         # TODO
         # THIS CMD SHOULD NOT BE USED OUTSIDE THE DEMO

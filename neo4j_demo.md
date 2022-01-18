@@ -170,5 +170,71 @@ Pull out the distribution of durations w.r.t. an exit state.
 
 
 # 13. Link with SNAP/CINES
-Execute a query on Neo4j, retrieve the subgraphs, convert subgraphs to SNAP TTables batch by batch. This is useful for some graph algorithms. 
+Execute a query on Neo4j, retrieve the subgraphs, convert subgraphs to SNAP TTables batch by batch. This is useful for some graph algorithms. Note that constructing TTables can be tricky, and the documents of SNAP is not perfect. 
+- More about TTables: 
+  - https://snap.stanford.edu/snappy/doc/reference/conv.html
+  - https://snap.stanford.edu/snappy/doc/reference/table.html
 - TICSMTC: https://github.com/LeSaRDe/neo4j_test/blob/master/neo4j_ops.py
+
+
+# 14. Another Example (fast)
+- Query population distribution grouped BY `age_group`
+- Cypher code:
+  ```cypher
+  match (n)
+  with distinct n.age_group as age_group
+  unwind age_group as each_age_group
+  match (m)
+  where m.age_group = each_age_group
+  return each_age_group, count(m)
+  ```
+
+- Results:
+  
+  | each_age_group | count(m) |
+  |---|---|
+  | "a"| 213047|
+  | "p"| 35874|
+  | "s"| 97906|
+  | "g"| 82645|
+  | "o"| 119131
+  Running time: 2498 ms
+
+
+## 15. One More Example (use apoc graph properties)
+Query incoming degrees of infected people at a given time point. 
+- Get infected PIDs
+- Cypher code:
+  ```cypher
+  unwind $infect_pid as infect_pid
+  match (n:PERSON {pid: infect_pid})
+  return infect_pid, apoc.node.degree(n, "<CONTACT")
+  ```
+- Run it out. TICSMTC: https://github.com/LeSaRDe/neo4j_test/blob/master/neo4j_ops.py
+
+
+# 16. The Last Example (Slow)
+- Query source activity distribution
+- Cypher code:
+  ```cypher
+  match ()-[r]->()
+  with distinct r.src_act as src_act
+  unwind src_act as each_src_act
+  match ()-[q]->()
+  where q.src_act = each_src_act
+  return each_src_act, count(q)
+  ```
+   
+- Results:
+  
+  | each_src_act | count(q) |
+  |---|---|
+  | "1:1"        | 22796760 |
+  | "1:5"        | 15745284 |
+  | "1:3"        | 4761003  |
+  | "1:2"        | 38399970 |
+  | "1:4"        | 39981876 |
+  | "1:7"        | 157923   |
+  | "1:6"        | 3548364  |
+
+  Running time: 1154917ms = ~19min
