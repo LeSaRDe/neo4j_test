@@ -96,10 +96,11 @@ g_init_cn_folder = '/project/biocomplexity/mf3jh/neo4j_workspace/import/'
 # 'g_int_cn_folder' should be a folder under 'g_init_cn_folder'.
 # Modify 'g_int_cn_folder' to the desired folder.
 g_int_cn_folder = 'wy_replicate_0'
+g_int_cn_file_fmt = 'network_no_head_\d+'
 g_epihiper_output_folder = '/project/biocomplexity/mf3jh/epihiper_data/'
 
 # !!!CAUTION!!!
-# Make sure that the files specified by 'g_init_cn_file_name', 'g_person_trait_file_name' and 'g_int_cn_path_fmt' are
+# Make sure that the files specified by 'g_init_cn_file_name', 'g_person_trait_file_name' and 'g_int_cn_file_fmt' are
 # CSV files without schema, i.e. the first line of file should be the header and the rest is data.
 # The following command can help remove the schema:
 # ```
@@ -124,7 +125,6 @@ g_init_cn_file_name = 'wy_contact_network_config_m_5_M_40_a_1000_m-contact_0_wit
 g_person_trait_file_name = 'wy_persontrait_epihiper_no_head.txt'
 
 g_init_cn_path = path.join(g_init_cn_folder, g_init_cn_file_name)
-g_int_cn_path_fmt = path.join(g_int_cn_folder, 'network_[{0}]')
 g_person_trait_path = path.join(g_init_cn_folder, g_person_trait_file_name)
 g_epihiper_output_path = path.join(g_epihiper_output_folder, g_int_cn_folder, 'output.csv')
 g_epihiper_output_db_path = path.join(g_epihiper_output_folder, g_int_cn_folder, 'output.db')
@@ -144,6 +144,7 @@ if g_neo4j_edition == 'community':
     g_neo4j_db_name = 'neo4j'
 elif g_neo4j_edition == 'enterprise':
     g_neo4j_db_name = 'cndb'
+
 g_epihiper_output_tb_name = 'epihiper_output'
 
 
@@ -575,16 +576,13 @@ def create_int_cn_edges_auto_search(neo4j_driver, search_folder, l_time_points, 
     logging.critical('[create_int_cn_edges_auto_search] Starts.')
     timer_start = time.time()
 
-    # INTERMEDIATE CONTACT NETWORK FILE NAME REGEX PATTERN
-    int_cn_file_fmt = 'network\[\d+\]'
-
     # CONFIGURE NEO4J SESSION
     neo4j_session_config = {'database': g_neo4j_db_name}
 
     # SEARCH FOR INT CN AND LOAD IN
     for (dirpath, dirname, filenames) in walk(search_folder):
         for filename in filenames:
-            if re.match(int_cn_file_fmt, filename) is None:
+            if re.match(g_int_cn_file_fmt, filename) is None:
                 continue
             l_num_str = re.findall(r'[0-9]+', filename)
             if len(l_num_str) != 1:
@@ -593,6 +591,7 @@ def create_int_cn_edges_auto_search(neo4j_driver, search_folder, l_time_points, 
             time_point = int(l_num_str[0])
             if int(l_num_str[0]) not in l_time_points:
                 continue
+            logging.critical('[create_int_cn_edges_auto_search] Loading edges for time point %s starts.' % (time_point))
             create_edges(path.join(g_int_cn_folder, filename), time_point, neo4j_driver, batch_size, method)
             logging.critical('[create_int_cn_edges_auto_search] Loading edges for time point %s done in %s secs.'
                              % (time_point, time.time() - timer_start))
@@ -731,7 +730,7 @@ def load_epihiper_output_to_db(batch_size=10000):
     TODO
         It may look neater refactoring the DB connection and closure to 'with' statement.
     """
-    print('[load_epihiper_output_to_db] Starts.')
+    logging.critical('[load_epihiper_output_to_db] Starts.')
     timer_start = time.time()
 
     if not path.exists(g_epihiper_output_path):
@@ -769,14 +768,14 @@ def load_epihiper_output_to_db(batch_size=10000):
                 out_id += 1
                 if out_id % batch_size == 0 and out_id >= batch_size:
                     db_con.commit()
-                    print('[load_epihiper_output_to_db] Committed %s recs in %s secs.'
+                    logging.critical('[load_epihiper_output_to_db] Committed %s recs in %s secs.'
                           % (out_id, time.time() - timer_start))
             except Exception as e:
                 logging.error('[load_epihiper_output_to_db] row: %s, error: %s' % (row, e))
                 err = True
         try:
             db_con.commit()
-            print('[load_epihiper_output_to_db] Committed %s recs in %s secs.'
+            logging.critical('[load_epihiper_output_to_db] Committed %s recs in %s secs.'
                   % (out_id, time.time() - timer_start))
         except Exception as e:
             logging.error('[load_epihiper_output_to_db] row: %s, error: %s' % (row, e))
@@ -785,9 +784,9 @@ def load_epihiper_output_to_db(batch_size=10000):
     db_con.close()
 
     if err:
-        print('[load_epihiper_output_to_db] Return with errors in %s secs.' % str(time.time() - timer_start))
+        logging.critical('[load_epihiper_output_to_db] Return with errors in %s secs.' % str(time.time() - timer_start))
     else:
-        print('[load_epihiper_output_to_db] All done in %s secs.' % str(time.time() - timer_start))
+        logging.critical('[load_epihiper_output_to_db] All done in %s secs.' % str(time.time() - timer_start))
     return not err
 
 
@@ -795,7 +794,7 @@ def create_indexes_on_epihipter_output_db():
     """
     Return True if successes, False otherwise.
     """
-    print('[create_indexes_on_epihipter_output_db] Starts.')
+    logging.critical('[create_indexes_on_epihipter_output_db] Starts.')
     timer_start = time.time()
 
     try:
@@ -826,18 +825,18 @@ def create_indexes_on_epihipter_output_db():
         return False
 
     db_con.close()
-    print('[create_indexes_on_epihipter_output_db] All done in %s secs.' % str(time.time() - timer_start))
+    logging.critical('[create_indexes_on_epihipter_output_db] All done in %s secs.' % str(time.time() - timer_start))
     return True
 
 
-def fetch_pids_by_exit_state(exit_state):
+def fetch_pids_by_exit_state(exit_state, out_path):
     """
     Return the list of PIDs over time for a given exit state.
     :return: pandas DataFrame
         Index: tick (int)
         Column: pid (list of int)
     """
-    print('[fetch_pids_by_exit_state] Starts.')
+    logging.critical('[fetch_pids_by_exit_state] Starts.')
     timer_start = time.time()
 
     try:
@@ -870,11 +869,91 @@ def fetch_pids_by_exit_state(exit_state):
         l_rec.append((tick, d_pid_by_tick[tick]))
     df_pid_by_tick = pd.DataFrame(l_rec, columns=['tick', 'pid'])
     df_pid_by_tick = df_pid_by_tick.set_index('tick')
-    pd.to_pickle(df_pid_by_tick, ''.join([g_epihiper_output_folder, 'output_pid_over_time_by_%s.pickle' % exit_state]))
+    pd.to_pickle(df_pid_by_tick,  out_path)
 
     db_con.close()
-    print('[fetch_pids_by_exit_state] All done in %s secs.' % str(time.time() - timer_start))
+    logging.critical('[fetch_pids_by_exit_state] All done in %s secs.' % str(time.time() - timer_start))
     return df_pid_by_tick
+
+
+def duration_distribution(neo4j_driver, df_output_pid_over_time, out_name_suffix, data_out_path, img_out_path,
+                          save_img=True, l_t=None, mode='in_1nn'):
+    """
+    Get the duration distribution over a subgraph of contact network at time points specified by 'l_t'.
+    The subgraph is defined by 'mode'.
+    :param
+        df_output_pid_over_time: pandas DataFrame
+            Filtered PIDs over time. The subgraph is constructed starting from these PIDs.
+    :param
+        l_t: list of int
+            The given time points. '-1' means the initial contact graph.
+    :param
+        mode: str
+            'in_1nn': The subgraph is the 1-nearest-neighbor graph induced by incoming edges based on 'l_core_pids'.
+    :return: 2D ndarray
+        Dim 0: Durations sorted in the ascending order.
+        Dim 1: Counts of durations.
+    """
+    logging.critical('[duration_distribution] Starts.')
+    timer_start = time.time()
+
+    neo4j_session_config = {'database': g_neo4j_db_name}
+
+    if mode == 'in_1nn':
+        query_str = '''with $l_core_pid as l_core_pid, $tick as tick
+                       match (n:PERSON) where n.pid in l_core_pid
+                       match ()-[r:CONTACT]->(n) where r.occur = tick
+                       return r.duration as d
+                    '''
+
+    if l_t is None:
+        l_t = df_output_pid_over_time.index.to_list()
+
+    l_dist_rec = []
+    for tick, pid_rec in df_output_pid_over_time.loc[l_t].iterrows():
+        d_duration = dict()
+        l_core_pids = pid_rec['pid']
+        query_param = {'l_core_pid': l_core_pids, 'tick': tick}
+        l_ret = execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str], l_query_param=[query_param],
+                                      need_ret=True)
+        for rec in l_ret[0]:
+            duration = int(rec[0])
+            if duration not in d_duration:
+                d_duration[duration] = 1
+            else:
+                d_duration[duration] += 1
+        if len(d_duration) <= 0:
+            continue
+        l_dist_rec.append((tick, d_duration))
+
+    df_dist = pd.DataFrame(l_dist_rec, columns=['tick', 'duration_dist'])
+    df_dist = df_dist.set_index('tick')
+    pd.to_pickle(df_dist, data_out_path)
+    logging.critical('[duration_distribution] Output results.')
+
+    # PLOT
+    if save_img:
+        fig, axes = plt.subplots(ncols=1, nrows=1)
+        d_draw = dict()
+        for tick, dist_rec in df_dist.iterrows():
+            d_dist = dist_rec['duration_dist']
+            l_duration = []
+            for duration in d_dist:
+                l_duration += [duration] * d_dist[duration]
+            d_draw['t' + str(tick)] = l_duration
+        sns.histplot(d_draw, multiple='stack', legend=True, ax=axes)
+        axes.set_title('Duration Distribution Over Time With Exit State %s' % out_name_suffix, fontsize=12,
+                       fontweight='semibold')
+        axes.set_xlabel('Duration', fontweight='semibold')
+        axes.set_ylabel('Frequency', fontweight='semibold')
+        plt.tight_layout(pad=1.0)
+        plt.savefig(img_out_path, format='PNG')
+        plt.show()
+        plt.clf()
+        plt.close()
+
+    logging.critical('[duration_distribution] All done in %s secs.' % str(time.time() - timer_start))
+
 
 ################################################################################
 #   FROM NEO4J TO SNAP
@@ -917,7 +996,8 @@ def add_edge_to_snap_graph(tneanet_ins, src_pid, trg_pid, duration, src_act, trg
     return tneanet_ins
 
 
-def neo4j_query_to_ttables(neo4j_query_str, query_params, out_folder, out_suffix=None):
+def neo4j_query_to_ttables(neo4j_driver, neo4j_session_config, neo4j_query_str, query_params, out_folder,
+                           out_suffix=None):
     """
     This function executes a query for a subgraph from Neo4j, and outputs the subgraph represented by the node and edge
     TTables.
@@ -936,6 +1016,9 @@ def neo4j_query_to_ttables(neo4j_query_str, query_params, out_folder, out_suffix
         out_suffix: str
             The suffix for output TTable names. Note that this suffix typically should contain the ID for the output
             graph in a sense.
+    :return
+        - True: successful output.
+        - False: nothing to output.
     """
     logging.critical('[neo4j_query_to_ttables] Starts.')
 
@@ -953,12 +1036,12 @@ def neo4j_query_to_ttables(neo4j_query_str, query_params, out_folder, out_suffix
         l_query_param = [query_params]
     l_ret = execute_neo4j_queries(neo4j_driver,
                                   neo4j_session_config,
-                                  [query_str],
+                                  [neo4j_query_str],
                                   l_query_param=l_query_param,
                                   need_ret=True)
     if len(l_ret[0]) <= 0:
-        logging.error('[neo4j_query_to_ttables] Nothing retrieved for the query: %s' % neo4j_query_str)
-        return None
+        logging.critical('[neo4j_query_to_ttables] Nothing retrieved for the query: %s' % neo4j_query_str)
+        return False
 
     # Construct a TNEANet network
     tneanet_ins = snap.TNEANet.New()
@@ -1011,13 +1094,44 @@ def neo4j_query_to_ttables(neo4j_query_str, query_params, out_folder, out_suffix
         out_suffix = ''
     else:
         out_suffix = ''.join(['_', out_suffix])
-    fd_out = snap.TFOut(''.join([out_folder, 'node_ttable%s.bin' % out_suffix]))
+    fd_out = snap.TFOut(path.join(out_folder, 'node_ttable%s.bin' % out_suffix))
     node_ttable.Save(fd_out)
     fd_out.Flush()
-    fd_out = snap.TFOut(''.join([out_folder, 'edge_ttable%s.bin' % out_suffix]))
+    fd_out = snap.TFOut(path.join(out_folder, 'edge_ttable%s.bin' % out_suffix))
     edge_ttable.Save(fd_out)
     fd_out.Flush()
     logging.critical('[neo4j_query_to_ttables] All done in %s secs.' % str(time.time() - timer_start))
+    return True
+
+
+def output_in_1nn_batch(neo4j_driver, df_output_pid_over_time, batch_size, out_folder, out_suffix):
+    logging.critical('[output_in_1nn_batch] Starts.')
+    timer_start = time.time()
+
+    neo4j_session_config = {'database': g_neo4j_db_name}
+    query_str_fmt = '''with $l_core_pid as l_core_pid, $tick as tick
+                       match (t:PERSON) where t.pid in l_core_pid
+                       match (s:PERSON)-[r:CONTACT]->(t) where r.occur = tick
+                       return s, t, r
+                       skip %s limit %s
+                    '''
+
+    for tick, pid_rec in df_output_pid_over_time.iterrows():
+        l_core_pids = pid_rec['pid']
+        query_param = {'l_core_pid': l_core_pids, 'tick': tick}
+        skip = 0
+        limit = batch_size
+        batch_cnt = 0
+        while True:
+            neo4j_query_str = query_str_fmt % (skip, limit)
+            ret = neo4j_query_to_ttables(neo4j_driver, neo4j_session_config, neo4j_query_str, query_param, out_folder,
+                                         ''.join([out_suffix, '_', str(batch_cnt)]))
+            if not ret:
+                print('[output_in_1nn_batch] Done graph output with %s batches for tick %s' % (batch_cnt, tick))
+                break
+            skip += limit
+            batch_cnt += 1
+    logging.critical('[output_in_1nn_batch] All done in %s secs.' % str(time.time() - timer_start))
 
 
 if __name__ == '__main__':
@@ -1217,7 +1331,7 @@ if __name__ == '__main__':
         elif cmd == 'create_int_cn_edges':
             logging.critical('[main] create_int_cn_edges starts.')
             search_folder = path.join(g_init_cn_folder, g_int_cn_folder)
-            l_time_points = [0, 1]
+            l_time_points = [0, 1, 2, 3, 4]
             batch_size = 500000
             method = 'apoc'
             create_int_cn_edges_auto_search(neo4j_driver, search_folder, l_time_points, batch_size, method)
@@ -1246,5 +1360,95 @@ if __name__ == '__main__':
         elif cmd == 'fetch_pids_by_exit_state':
             logging.critical('[main] fetch_pids_by_exit_state starts.')
             exit_state = 'Isymp_s'
-            fetch_pids_by_exit_state(exit_state)
+            out_path = path.join(g_epihiper_output_folder, g_int_cn_folder, 'pid_over_time_by_%s.pickle' % exit_state)
+            fetch_pids_by_exit_state(exit_state, out_path)
             logging.critical('[main] fetch_pids_by_exit_state done.')
+
+        # COMPUTE DISTRIBUTION OF DURATION OVER TIME
+        elif cmd == 'duration_distribution':
+            logging.critical('[main] duration_distribution starts.')
+            exit_state = 'Isymp_s'
+            pid_file_path = path.join(g_epihiper_output_folder, g_int_cn_folder,
+                                      'pid_over_time_by_%s.pickle' % exit_state)
+            df_output_pid_over_time = pd.read_pickle(pid_file_path)
+            duration_distribution(neo4j_driver, df_output_pid_over_time, exit_state,
+                                  path.join(g_epihiper_output_folder, g_int_cn_folder,
+                                            'duration_dist_%s.pickle' % exit_state),
+                                  path.join(g_epihiper_output_folder, g_int_cn_folder,
+                                            'duration_distribution_%s.PNG' % exit_state))
+            logging.critical('[main] duration_distribution done.')
+
+        # OUTPUT BATCHED TNEANET GRAPHS TO FILES
+        elif cmd == 'output_in_1nn_batch':
+            logging.critical('[main] output_in_1nn_batch starts.')
+            exit_state = 'Isymp_s'
+            pid_file_path = path.join(g_epihiper_output_folder, g_int_cn_folder,
+                                      'pid_over_time_by_%s.pickle' % exit_state)
+            df_output_pid_over_time = pd.read_pickle(pid_file_path)
+            batch_size = 1000
+            out_folder = path.join(g_epihiper_output_folder, g_int_cn_folder)
+            output_in_1nn_batch(neo4j_driver, df_output_pid_over_time, batch_size, out_folder, exit_state)
+            logging.critical('[main] output_in_1nn done.')
+
+        # TODO
+        # THIS CMD SHOULD NOT BE USED OUTSIDE THE DEMO
+        # GENERATE BOGUS DATA FOR DEMO
+        elif cmd == 'bogus_data':
+            logging.critical('[main] bogus_data starts.')
+            try:
+                db_con = sqlite3.connect(g_epihiper_output_db_path)
+                db_cur = db_con.cursor()
+            except Exception as e:
+                logging.error(e)
+                sys.exit(-1)
+
+            sql_str = '''select tick, pid, exit_state, contact_pid, lid from %s where tick in (5, 6, 7, 8, 9)''' \
+                      % (g_epihiper_output_tb_name)
+            try:
+                db_cur.execute(sql_str)
+                rows = db_cur.fetchall()
+            except Exception as e:
+                logging.error('[main] %s' % e)
+                sys.exit(-1)
+
+            sql_str = '''insert into %s (out_id, tick, pid, exit_state, contact_pid, lid) values (?,?,?,?,?,?)''' \
+                      % g_epihiper_output_tb_name
+
+            batch_size = 1000
+            out_id = 3000000
+            for row in rows:
+                tick = int(row[0])
+                if tick not in [5, 6, 7, 8, 9]:
+                    continue
+                if tick == 5:
+                    tick = 0
+                elif tick == 6:
+                    tick = 1
+                elif tick == 7:
+                    tick = 2
+                elif tick == 8:
+                    tick = 3
+                elif tick == 9:
+                    tick = 4
+                pid = int(row[1])
+                exit_state = row[2]
+                if row[3] is None:
+                    contact_pid = None
+                else:
+                    contact_pid = int(row[3])
+                lid = row[4]
+                try:
+                    db_cur.execute(sql_str, (out_id, tick, pid, exit_state, contact_pid, lid))
+                    out_id += 1
+                    if out_id % batch_size == 0 and out_id >= batch_size:
+                        db_con.commit()
+                        logging.critical('[main] Committed %s recs.' % str(out_id - 3000000))
+                except Exception as e:
+                    logging.error('[main] row: %s, error: %s' % (row, e))
+            try:
+                db_con.commit()
+                logging.critical('[main] Committed %s recs.' % str(out_id - 3000000))
+            except Exception as e:
+                logging.error('[main] final commit, error: %s' % e)
+            db_con.close()
+            logging.critical('[main] bogus_data done.')

@@ -1,5 +1,8 @@
 # Neo4j Demo
 
+## 0. Motivation
+EpiHiper works on contact networks and output modified contact networks as well as some addditional simulation results. Can we maintain these data into data structures and make analyses on the networks and results over time? A series of questions need to be answered such as how to store the contact networks (both in memory and disc), how to make queries over the networks, how to handle the time series, can we do these efficiently, and etc. 
+
 
 ## 1. Environment Preparation
 - **Mandatory**: 
@@ -129,18 +132,43 @@ Two different methods were tried.
 Similar to creating nodes. 
 - Some Results:
   - Method (B): $\sim 15$ minutes.
-  - The database size of all data for the initial contact network of WY is about $14$GB. The input data size is about $722$MB. In other words, about $20$ times expansion. 
   - Method (A): When loading in VA data, it took more than $30$ hours using a single thread. 
+  - Method (B): For the same VA data, it took about $4.5$ hours. 
 
 
 ## 10. Create Edges for Intermediate Contact Networks
 Similar as before. 
+- A key concept capturing the time series is the `occur` attribute at edges. `occur = -1` for the initial contact network, and `occur > 0` for intermediate networks.
 - Some Results:
-  - Method (B): $\sim 20$ minutes for two intermediate contact networks.
+  - Method (B): $\sim 1.7$ hours for loading in 5 intermediate contact networks in sequence. 
+  
+    | CN Edge File | Lines  | Time |
+    |---|---|---|
+    |Initial|21685569|15 min|
+    |network[0]|21685569|23 min|
+    |network[1]|21685569|18 min|
+    |network[2]|20111489|17 min|
+    |network[3]|20111489|17 min|
+    |network[4]|20111489|30 min|
+  - The input data to Neo4j (initial contact networks + 5 intermediate contact networks) is about $7$GB. The database size now is about $62$GB. The expansion ratio is about $9$.  
 
 
-## 11 Create SQLite DB for EpiHiper Output
+## 11. Create SQLite DB for EpiHiper Output
 When using Neo4j to process EpiHiper's data, my methodology is *keep networks inside Neo4j and the rest outside*. Sounds trivial, but it may become much less trivial when things turn complex. 
 - Create DB, Load output data, Create indexes.
 - Running time is trivail so far. 
+- Take a look at the data structure and indexes. TICSMTC: https://github.com/LeSaRDe/neo4j_test/blob/master/neo4j_ops.py
+
+
+## 12. A Concrete Scenario
+Pull out the distribution of durations w.r.t. an exit state. 
+- Given an exit state: `Isymp_s`
+- Fetch PIDs over time for this exit state (SQLite).
+- Find contacts incoming to these PIDS for each time point. Translated: query incoming 1-nearest-neighbors of a given set of nodes for each time point. (Neo4j)
+- Get the distribution of durations.
+- TICSMTC: https://github.com/LeSaRDe/neo4j_test/blob/master/neo4j_ops.py
+
+
+# 13. Link with SNAP/CINES
+Execute a query on Neo4j, retrieve the subgraphs, convert subgraphs to SNAP TTables batch by batch. This is useful for some graph algorithms. 
 - TICSMTC: https://github.com/LeSaRDe/neo4j_test/blob/master/neo4j_ops.py
