@@ -96,7 +96,7 @@ g_init_cn_folder = '/project/biocomplexity/mf3jh/neo4j_workspace/import/'
 # 'g_int_cn_folder' should be a folder under 'g_init_cn_folder'.
 # Modify 'g_int_cn_folder' to the desired folder.
 g_int_cn_folder = 'wy_replicate_0'
-g_int_cn_file_fmt = 'network_no_head_\d+'
+g_int_cn_file_fmt = 'network_no_head_sorted_\d+'
 g_epihiper_output_folder = '/project/biocomplexity/mf3jh/epihiper_data/'
 
 # !!!CAUTION!!!
@@ -146,6 +146,11 @@ elif g_neo4j_edition == 'enterprise':
     g_neo4j_db_name = 'cndb'
 
 g_epihiper_output_tb_name = 'epihiper_output'
+
+
+# Only for examle queries
+g_example_query_folder = '/project/biocomplexity/mf3jh/example_queries/'
+g_example_query_each_folder_fmt = path.join(g_example_query_folder, 'query_{0}')
 
 
 ################################################################################
@@ -576,9 +581,6 @@ def create_int_cn_edges_auto_search(neo4j_driver, search_folder, l_time_points, 
     logging.critical('[create_int_cn_edges_auto_search] Starts.')
     timer_start = time.time()
 
-    # CONFIGURE NEO4J SESSION
-    neo4j_session_config = {'database': g_neo4j_db_name}
-
     # SEARCH FOR INT CN AND LOAD IN
     for (dirpath, dirname, filenames) in walk(search_folder):
         for filename in filenames:
@@ -599,88 +601,88 @@ def create_int_cn_edges_auto_search(neo4j_driver, search_folder, l_time_points, 
     logging.critical('[create_int_cn_edges_auto_search] All done in %s secs.' % str(time.time() - timer_start))
 
 
-def create_int_cn_auto_search(neo4j_driver, search_folder, int_cn_batch_size=1000000):
-    """
-    Search for intermediate files and load in.
-    """
-    logging.critical('[create_int_cn_auto_search] Starts.')
-
-    if not path.exists(search_folder):
-        logging.critical('[create_int_cn_auto_search] search_folder %s does not exist.' % search_folder)
-        return None
-
-    int_cn_file_fmt = 'network\[\d+\]'
-
-    timer_start_init = time.time()
-    timer_start = time.time()
-
-    # CONFIGURE NEO4J SESSION
-    neo4j_session_config = {'database': g_neo4j_db_name}
-
-    # LOAD IN INTERMEDIATE CONTACT NETWORKS
-    # occur_time_stamp = -1
-    query_str_fmt = '''unwind $rec as rec
-                       match (src:PERSON), (trg:PERSON)
-                       where src.pid=rec.sourcePID and trg.pid=rec.targetPID
-                       create (src)-[r:CONTACT {occur: %s, src_act:rec.sourceActivity, trg_act:rec.targetActivity,
-                       duration:rec.duration}]->(trg)
-                    '''
-
-    for (dirpath, dirname, filenames) in walk(search_folder):
-        for filename in filenames:
-            if re.match(int_cn_file_fmt, filename) is None:
-                continue
-
-            # TEST ONLY STARTS
-            if filename != 'network[101]':
-                continue
-            # TEST ONLY ENDS
-
-            l_num_str = re.findall(r'[0-9]+', filename)
-            if len(l_num_str) != 1:
-                logging.error('[create_int_cn_auto_search] Confusing file occurs: %s' % filename)
-                continue
-
-            int_cn_idx = int(l_num_str[0])
-
-            total_cnt_per_int_cn = 0
-            l_int_cn_batch = []
-            with open(path.join(dirpath, filename), 'r') as in_fd:
-                csv_reader = csv.reader(in_fd, delimiter=',')
-                for row_idx, row in enumerate(csv_reader):
-                    if row_idx == 0 or row_idx == 1:
-                        continue
-                    else:
-                        targetPID = int(row[0])
-                        targetActivity = row[1]
-                        sourcePID = int(row[2])
-                        sourceActivity = row[3]
-                        duration = int(row[4])
-                        l_int_cn_batch.append({'targetPID': targetPID,
-                                               'targetActivity': targetActivity,
-                                               'sourcePID': sourcePID,
-                                               'sourceActivity': sourceActivity,
-                                               'duration': duration})
-                    # CREATE EDGES FOR EACH BATCH
-                    if len(l_int_cn_batch) >= int_cn_batch_size:
-                        query_param = {'rec': l_int_cn_batch}
-                        execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str_fmt % str(int_cn_idx)],
-                                              l_query_param=[query_param])
-                        total_cnt_per_int_cn += len(l_int_cn_batch)
-                        l_int_cn_batch = []
-                        logging.critical('[create_int_cn_auto_search] Int CN %s: Created %s edges in %s secs.'
-                              % (int_cn_idx, total_cnt_per_int_cn, time.time() - timer_start))
-                if len(l_int_cn_batch) > 0:
-                    query_param = {'rec': l_int_cn_batch}
-                    execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str_fmt % str(int_cn_idx)],
-                                          l_query_param=[query_param])
-                    total_cnt_per_int_cn += len(l_int_cn_batch)
-                    logging.critical('[create_int_cn_auto_search] Int CN %s: Created %s edges in %s secs.'
-                          % (int_cn_idx, total_cnt_per_int_cn, time.time() - timer_start))
-                logging.critical('[create_int_cn_auto_search] Int CN %s: All done in %s secs.'
-                      % (int_cn_idx, time.time() - timer_start))
-
-    logging.critical('[create_int_cn_auto_search] All done. Running time: %s ' % str(time.time() - timer_start_init))
+# def create_int_cn_auto_search(neo4j_driver, search_folder, int_cn_batch_size=1000000):
+#     """
+#     Search for intermediate files and load in.
+#     """
+#     logging.critical('[create_int_cn_auto_search] Starts.')
+#
+#     if not path.exists(search_folder):
+#         logging.critical('[create_int_cn_auto_search] search_folder %s does not exist.' % search_folder)
+#         return None
+#
+#     int_cn_file_fmt = 'network\[\d+\]'
+#
+#     timer_start_init = time.time()
+#     timer_start = time.time()
+#
+#     # CONFIGURE NEO4J SESSION
+#     neo4j_session_config = {'database': g_neo4j_db_name}
+#
+#     # LOAD IN INTERMEDIATE CONTACT NETWORKS
+#     # occur_time_stamp = -1
+#     query_str_fmt = '''unwind $rec as rec
+#                        match (src:PERSON), (trg:PERSON)
+#                        where src.pid=rec.sourcePID and trg.pid=rec.targetPID
+#                        create (src)-[r:CONTACT {occur: %s, src_act:rec.sourceActivity, trg_act:rec.targetActivity,
+#                        duration:rec.duration}]->(trg)
+#                     '''
+#
+#     for (dirpath, dirname, filenames) in walk(search_folder):
+#         for filename in filenames:
+#             if re.match(int_cn_file_fmt, filename) is None:
+#                 continue
+#
+#             # TEST ONLY STARTS
+#             if filename != 'network[101]':
+#                 continue
+#             # TEST ONLY ENDS
+#
+#             l_num_str = re.findall(r'[0-9]+', filename)
+#             if len(l_num_str) != 1:
+#                 logging.error('[create_int_cn_auto_search] Confusing file occurs: %s' % filename)
+#                 continue
+#
+#             int_cn_idx = int(l_num_str[0])
+#
+#             total_cnt_per_int_cn = 0
+#             l_int_cn_batch = []
+#             with open(path.join(dirpath, filename), 'r') as in_fd:
+#                 csv_reader = csv.reader(in_fd, delimiter=',')
+#                 for row_idx, row in enumerate(csv_reader):
+#                     if row_idx == 0 or row_idx == 1:
+#                         continue
+#                     else:
+#                         targetPID = int(row[0])
+#                         targetActivity = row[1]
+#                         sourcePID = int(row[2])
+#                         sourceActivity = row[3]
+#                         duration = int(row[4])
+#                         l_int_cn_batch.append({'targetPID': targetPID,
+#                                                'targetActivity': targetActivity,
+#                                                'sourcePID': sourcePID,
+#                                                'sourceActivity': sourceActivity,
+#                                                'duration': duration})
+#                     # CREATE EDGES FOR EACH BATCH
+#                     if len(l_int_cn_batch) >= int_cn_batch_size:
+#                         query_param = {'rec': l_int_cn_batch}
+#                         execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str_fmt % str(int_cn_idx)],
+#                                               l_query_param=[query_param])
+#                         total_cnt_per_int_cn += len(l_int_cn_batch)
+#                         l_int_cn_batch = []
+#                         logging.critical('[create_int_cn_auto_search] Int CN %s: Created %s edges in %s secs.'
+#                               % (int_cn_idx, total_cnt_per_int_cn, time.time() - timer_start))
+#                 if len(l_int_cn_batch) > 0:
+#                     query_param = {'rec': l_int_cn_batch}
+#                     execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str_fmt % str(int_cn_idx)],
+#                                           l_query_param=[query_param])
+#                     total_cnt_per_int_cn += len(l_int_cn_batch)
+#                     logging.critical('[create_int_cn_auto_search] Int CN %s: Created %s edges in %s secs.'
+#                           % (int_cn_idx, total_cnt_per_int_cn, time.time() - timer_start))
+#                 logging.critical('[create_int_cn_auto_search] Int CN %s: All done in %s secs.'
+#                       % (int_cn_idx, time.time() - timer_start))
+#
+#     logging.critical('[create_int_cn_auto_search] All done. Running time: %s ' % str(time.time() - timer_start_init))
 
 
 ################################################################################
@@ -901,6 +903,9 @@ def fetch_pids_by_exit_state(exit_state, out_path):
     return df_pid_by_tick
 
 
+################################################################################
+#   EXAMPLE QUERIES
+################################################################################
 def duration_distribution(neo4j_driver, df_output_pid_over_time, out_name_suffix, data_out_path, img_out_path,
                           save_img=True, l_t=None, mode='in_1nn'):
     """
@@ -978,6 +983,157 @@ def duration_distribution(neo4j_driver, df_output_pid_over_time, out_name_suffix
         plt.close()
 
     logging.critical('[duration_distribution] All done in %s secs.' % str(time.time() - timer_start))
+
+
+# Query 1
+# How many males between 18 and 24 years of age are newly infected
+# (i.e., are just transitioned to state I or its variants [this could be a set of states])
+# between times 5 and 15 inclusive? What are the PIDs of these males?
+#
+# Solution:
+#   (1) Query EpiHiper SQLite DB for all PIDs with 'exit_state="I..."' between times 5 and 15 inclusively.
+#   (2) Query Neo4j for 'n.pid' where 'n.age>=18 and n.age<=24' given the PIDs.
+#
+# Running Time:
+#   0.4s
+def query_1_sqlite_1(out_path):
+    """
+    Query for PIDs where 'exit_state' starts with 'I' and 'tick' between 5 and 15 inclusively.
+    """
+    logging.critical('[query_1_sqlite_1] Starts.')
+    timer_start = time.time()
+
+    try:
+        db_con = sqlite3.connect(g_epihiper_output_db_path)
+        db_cur = db_con.cursor()
+    except Exception as e:
+        logging.error(e)
+        return None
+
+    sql_str = '''PRAGMA case_sensitive_like=true'''
+    try:
+        db_cur.execute(sql_str)
+    except Exception as e:
+        logging.error('[query_1_sqlite_1] %s' % e)
+        return None
+
+    sql_str = '''select tick, pid from {0} where tick>=5 and tick<=15 and exit_state like "I%"'''\
+        .format(g_epihiper_output_tb_name)
+    try:
+        db_cur.execute(sql_str)
+        rows = db_cur.fetchall()
+    except Exception as e:
+        logging.error('[query_1_sqlite_1] %s' % e)
+        return None
+
+    l_pid_rec = []
+    for row in rows:
+        tick = int(row[0])
+        pid = int(row[1])
+        l_pid_rec.append((tick, pid))
+
+    df_pid = pd.DataFrame(l_pid_rec, columns=['tick', 'pid'])
+    pd.to_pickle(df_pid, out_path)
+
+    db_con.close()
+    logging.critical('[query_1_sqlite_1] All done in %s secs.' % str(time.time() - timer_start))
+
+
+def query_1_neo4j_1(neo4j_driver, df_pid, out_path):
+    """
+    Query for PIDs where 'n.age>=18 and n.age<=24 and n.gender=2'.
+    """
+    logging.critical('[query_1_neo4j_1] Starts.')
+    timer_start = time.time()
+
+    neo4j_session_config = {'database': g_neo4j_db_name}
+
+    l_infect_pid = list(set(df_pid['pid'].to_list()))
+
+    query_str = '''unwind $infect_pid as infect_pid
+                   match (n:PERSON {pid: infect_pid})
+                   where n.age>=18 and n.age<=24 and n.gender=2
+                   return infect_pid'''
+    query_param = {'infect_pid': l_infect_pid}
+    ret = execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str], l_query_param=[query_param],
+                                need_ret=True)
+    df_ret = pd.DataFrame(ret[0], columns=['pid'])
+    pd.to_pickle(df_ret, out_path)
+
+    logging.critical('[query_1_neo4j_1] All done in %s secs.' % str(time.time() - timer_start))
+
+
+# Query 2
+# What are the states that are transitioned to by males or females that have the activity of shopping on their incoming
+# edges?
+#
+# Solution:
+#   (1) Query Neo4j for PIDs where for incoming edges 'r.trg_act="1:3"'.
+#   (2) Query SQLite for states and group by the states given the PIDs.
+#
+# Running Time:
+def query_2_neo4j_1(neo4j_driver, out_path):
+    """
+    Query for n.pid with ()-[r]->(n) where r.trg_act="1:3" for all n.
+    """
+    logging.critical('[query_2_neo4j_1] Starts.')
+    timer_start = time.time()
+
+    neo4j_session_config = {'database': g_neo4j_db_name}
+
+    query_str = '''match ()-[r:CONTACT]->(n)
+                   where r.trg_act="1:3"
+                   return distinct n.pid'''
+    ret = execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str], l_query_param=None, need_ret=True)
+    df_ret = pd.DataFrame(ret[0], columns=['pid'])
+    pd.to_pickle(df_ret, out_path)
+
+    logging.critical('[query_2_neo4j_1] All done in %s secs.' % str(time.time() - timer_start))
+
+
+def query_2_sqlite_1(df_pid, out_path):
+    """
+    Query for exit_state with group by given PIDs.
+    """
+    logging.critical('[query_2_sqlite_1] Starts.')
+    timer_start = time.time()
+
+    l_pid = df_pid['pid'].to_list()
+
+    try:
+        db_con = sqlite3.connect(g_epihiper_output_db_path)
+        db_cur = db_con.cursor()
+    except Exception as e:
+        logging.error(e)
+        return None
+
+    sql_str = "select exit_state, count(*) from {0} where pid in ({1}) group by exit_state" \
+        .format(g_epihiper_output_tb_name, ','.join(['?'] * len(l_pid)))
+    try:
+        db_cur.execute(sql_str, l_pid)
+        rows = db_cur.fetchall()
+    except Exception as e:
+        logging.error('[query_1_sqlite_1] %s' % e)
+        return None
+
+    l_exit_state_rec = []
+    for row in rows:
+        exit_state = row[0]
+        count = int(row[1])
+        l_exit_state_rec.append((exit_state, count))
+
+    df_exit_state = pd.DataFrame(l_exit_state_rec, columns=['exit_state', 'count'])
+    pd.to_pickle(df_exit_state, out_path)
+
+    db_con.close()
+    logging.critical('[query_2_sqlite_1] All done in %s secs.' % str(time.time() - timer_start))
+
+
+# Query 3
+# What are the states that are transitioned to by males between 75 and 90 or by females 32 to 39
+# where the other node of an edge, if there is an edge, is activity work?
+
+
 
 
 ################################################################################
@@ -1356,7 +1512,7 @@ if __name__ == '__main__':
         elif cmd == 'create_int_cn_edges':
             logging.critical('[main] create_int_cn_edges starts.')
             search_folder = path.join(g_init_cn_folder, g_int_cn_folder)
-            l_time_points = [0, 1, 2, 3, 4]
+            l_time_points = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
             batch_size = 500000
             method = 'apoc'
             create_int_cn_edges_auto_search(neo4j_driver, search_folder, l_time_points, batch_size, method)
@@ -1435,6 +1591,32 @@ if __name__ == '__main__':
             logging.critical(ret[0])
             # logging.critical([item for item in ret[0] if item['apoc.node.degree(n, "<CONTACT")'] > 0])
             logging.critical('[main] infect_in_deg_dist_at_t done.')
+
+        elif cmd == 'example_query_1':
+            logging.critical('[main] example_query_1 starts.')
+            timer_start = time.time()
+            query_id = 1
+            sqlite_out_name = 'sqlite_pid.pickle'
+            sqlite_out_path = path.join(g_example_query_each_folder_fmt.format(str(query_id)), sqlite_out_name)
+            neo4j_out_name = 'results.pickle'
+            neo4j_out_path = path.join(g_example_query_each_folder_fmt.format(str(query_id)), neo4j_out_name)
+            query_1_sqlite_1(sqlite_out_path)
+            df_pid = pd.read_pickle(sqlite_out_path)
+            query_1_neo4j_1(neo4j_driver, df_pid, neo4j_out_path)
+            logging.critical('[main] example_query_1 done in %s secs.' % str(time.time() - timer_start))
+
+        elif cmd == 'example_query_2':
+            logging.critical('[main] example_query_2 starts.')
+            timer_start = time.time()
+            query_id = 2
+            neo4j_out_name = 'neo4j_pid.pickle'
+            neo4j_out_path = path.join(g_example_query_each_folder_fmt.format(str(query_id)), neo4j_out_name)
+            sqlite_out_name = 'results.pickle'
+            sqlite_out_path = path.join(g_example_query_each_folder_fmt.format(str(query_id)), sqlite_out_name)
+            query_2_neo4j_1(neo4j_driver, neo4j_out_path)
+            df_pid = pd.read_pickle(neo4j_out_path)
+            query_2_sqlite_1(df_pid, sqlite_out_path)
+            logging.critical('[main] example_query_2 done in %s secs.' % str(time.time() - timer_start))
 
         # TODO
         # THIS CMD SHOULD NOT BE USED OUTSIDE THE DEMO

@@ -1530,7 +1530,7 @@ if __name__ == '__main__':
                            match (n:PERSON {pid: infect_pid})
                            return infect_pid, apoc.node.degree(n, "<CONTACT")'''
             query_param = {'infect_pid': l_infect_pid}
-            execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str], l_query_param=[query_param])
+            ret = execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str], l_query_param=[query_param])
             print([item for item in ret[0] if item['apoc.node.degree(n, "<CONTACT")'] > 0])
             print('[main] infect_in_deg_dist_at_t done.')
 

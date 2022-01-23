@@ -140,7 +140,7 @@ Similar to creating nodes.
 Similar as before. 
 - A key concept capturing the time series is the `occur` attribute at edges. `occur = -1` for the initial contact network, and `occur > 0` for intermediate networks.
 - Some Results:
-  - Method (B): $\sim 1.7$ hours for loading in 5 intermediate contact networks in sequence. 
+  - Method (B): $\sim 1.7$ hours for loading in the first 5 intermediate contact networks in sequence, and $\sim 5.8$ hours for loading in from $5$ to $15$. 
   
     | CN Edge File | Lines  | Time |
     |---|---|---|
@@ -150,7 +150,18 @@ Similar as before.
     |network[2]|20111489|17 min|
     |network[3]|20111489|17 min|
     |network[4]|20111489|30 min|
-  - The input data to Neo4j (initial contact networks + 5 intermediate contact networks) is about $7$GB. The database size now is about $62$GB. The expansion ratio is about $9$.  
+    |network[5]|20111489|246 min|
+    |network[6]|20111489|24 min|
+    |network[7]|20111489|16 min|
+    |network[8]|20079945|33 min|
+    |network[9]|20040281|23 min|
+    |network[10]|19991167|48 min|
+    |network[11]|19941589|92 min|
+    |network[12]|19886993|18 min|
+    |network[13]|19841011|38 min|
+    |network[14]|19782673|16 min|
+    |network[15]|19729413|22 min|
+  - The size of initial contact networks and the first $5$ intermediate contact networks is about $7$GB. After loading, the database size is about $62$GB. The size of initial contact network and the first $16$ intermediate contact network is about $20.7$GB. After loading, the database size is about $130$GB. The expansion ratio is about $6 \sim 9$.
 
 
 ## 11. Create SQLite DB for EpiHiper Output
@@ -238,3 +249,12 @@ Query incoming degrees of infected people at a given time point.
   | "1:6"        | 3548364  |
 
   Running time: 1154917ms = ~19min
+
+
+# 17. Example Queries 
+- (1) How many males between 18 and 24 years of age are newly infected (i.e., are just transitioned to state I or its variants [this could be a set of states]) between times 5 and 15 inclusive? What are the PIDs of these males?
+  - Running Time: 0.4s
+  - /project/biocomplexity/mf3jh/example_queries/query_1
+- (2) What are the states that are transitioned to by males or females that have the activity of shopping on their incoming edges?
+  - Running Time: 
+  - /project/biocomplexity/mf3jh/example_queries/query_2
