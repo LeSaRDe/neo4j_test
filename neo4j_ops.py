@@ -1072,6 +1072,7 @@ def query_1_neo4j_1(neo4j_driver, df_pid, out_path):
 #   (2) Query SQLite for states and group by the states given the PIDs.
 #
 # Running Time:
+#   18s
 def query_2_neo4j_1(neo4j_driver, out_path):
     """
     Query for n.pid with ()-[r]->(n) where r.trg_act="1:3" for all n.
@@ -1113,7 +1114,7 @@ def query_2_sqlite_1(df_pid, out_path):
         db_cur.execute(sql_str, l_pid)
         rows = db_cur.fetchall()
     except Exception as e:
-        logging.error('[query_1_sqlite_1] %s' % e)
+        logging.error('[query_2_sqlite_1] %s' % e)
         return None
 
     l_exit_state_rec = []
@@ -1132,8 +1133,107 @@ def query_2_sqlite_1(df_pid, out_path):
 # Query 3
 # What are the states that are transitioned to by males between 75 and 90 or by females 32 to 39
 # where the other node of an edge, if there is an edge, is activity work?
+#
+# Solution:
+#   (1) Query Neo4j for PIDs where (n.gender=2 and n.age>=71 and n.age<= 90) or (n.gender=1 and n.age>=32 and n.age<=39)
+#       with incoming edges where r.src_act="1:2".
+#   (2) Query SQLite for exit_state given PIDs.
+#
+# Running Time:
+#   47s
+def query_3_neo4j_1(neo4j_driver, out_path):
+    """
+    Query Neo4j for PIDs where (n.gender=2 and n.age>=71 and n.age<= 90) or (n.gender=1 and n.age>=32 and n.age<=39)
+    with incoming edges where r.src_act="1:2".
+    """
+    logging.critical('[query_3_neo4j_1] Starts.')
+    timer_start = time.time()
+
+    neo4j_session_config = {'database': g_neo4j_db_name}
+
+    query_str = '''match ()-[r:CONTACT]->(n)
+                   where (r.src_act="1:2") and 
+                         ((n.gender=2 and n.age>=71 and n.age<=90) 
+                          or 
+                          (n.gender=1 and n.age>=32 and n.age<=39))
+                   return distinct n.pid'''
+    ret = execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str], l_query_param=None, need_ret=True)
+    df_ret = pd.DataFrame(ret[0], columns=['pid'])
+    pd.to_pickle(df_ret, out_path)
+
+    logging.critical('[query_3_neo4j_1] All done in %s secs.' % str(time.time() - timer_start))
 
 
+def query_3_sqlite_1(df_pid, out_path):
+    """
+    Query SQLite for exit_state given PIDs with group by.
+    """
+    logging.critical('[query_3_sqlite_1] Starts.')
+    timer_start = time.time()
+
+    l_pid = df_pid['pid'].to_list()
+
+    try:
+        db_con = sqlite3.connect(g_epihiper_output_db_path)
+        db_cur = db_con.cursor()
+    except Exception as e:
+        logging.error(e)
+        return None
+
+    sql_str = "select exit_state, count(*) from {0} where pid in ({1}) group by exit_state" \
+        .format(g_epihiper_output_tb_name, ','.join(['?'] * len(l_pid)))
+    try:
+        db_cur.execute(sql_str, l_pid)
+        rows = db_cur.fetchall()
+    except Exception as e:
+        logging.error('[query_3_sqlite_1] %s' % e)
+        return None
+
+    l_exit_state_rec = []
+    for row in rows:
+        exit_state = row[0]
+        count = int(row[1])
+        l_exit_state_rec.append((exit_state, count))
+
+    df_exit_state = pd.DataFrame(l_exit_state_rec, columns=['exit_state', 'count'])
+    pd.to_pickle(df_exit_state, out_path)
+
+    db_con.close()
+    logging.critical('[query_3_sqlite_1] All done in %s secs.' % str(time.time() - timer_start))
+
+
+# Query 4
+# What people (individuals) are entering the recovered state (in an SIR epidemic) between times 5 and 15 inclusive,
+# where the household income is between $86,000 and $114,000 annually?
+#
+# Question:
+#   Where is the household income information?
+
+
+# Query 5
+# What are the household IDs of households where the number of people in the household is at least 6 and
+# there is at least one child between 8 and 14?
+#
+# Solution:
+#   (1) Only Neo4j is needed. Find all HIDs associated with more than 6 members, then for each HID check if it has
+#       at least one member between 8 and 14.
+def query_5_neo4j_1(neo4j_driver, out_path):
+    logging.critical('[query_5_neo4j_1] Starts.')
+    timer_start = time.time()
+
+    neo4j_session_config = {'database': g_neo4j_db_name}
+
+    query_str = '''match (n:PERSON)  
+                   with distinct n.hid as trg_hid, count(n) as cnt
+                   where cnt>=8
+                   match (m:PERSON)
+                   where m.hid=trg_hid and 8<=m.age<=14
+                   return distinct m.hid'''
+    ret = execute_neo4j_queries(neo4j_driver, neo4j_session_config, [query_str], l_query_param=None, need_ret=True)
+    df_ret = pd.DataFrame(ret[0], columns=['hid'])
+    pd.to_pickle(df_ret, out_path)
+
+    logging.critical('[query_5_neo4j_1] All done in %s secs.' % str(time.time() - timer_start))
 
 
 ################################################################################
@@ -1617,6 +1717,28 @@ if __name__ == '__main__':
             df_pid = pd.read_pickle(neo4j_out_path)
             query_2_sqlite_1(df_pid, sqlite_out_path)
             logging.critical('[main] example_query_2 done in %s secs.' % str(time.time() - timer_start))
+
+        elif cmd == 'example_query_3':
+            logging.critical('[main] example_query_3 starts.')
+            timer_start = time.time()
+            query_id = 3
+            neo4j_out_name = 'neo4j_pid.pickle'
+            neo4j_out_path = path.join(g_example_query_each_folder_fmt.format(str(query_id)), neo4j_out_name)
+            sqlite_out_name = 'results.pickle'
+            sqlite_out_path = path.join(g_example_query_each_folder_fmt.format(str(query_id)), sqlite_out_name)
+            query_3_neo4j_1(neo4j_driver, neo4j_out_path)
+            df_pid = pd.read_pickle(neo4j_out_path)
+            query_3_sqlite_1(df_pid, sqlite_out_path)
+            logging.critical('[main] example_query_3 done in %s secs.' % str(time.time() - timer_start))
+
+        elif cmd == 'example_query_5':
+            logging.critical('[main] example_query_5 starts.')
+            timer_start = time.time()
+            query_id = 5
+            neo4j_out_name = 'results.pickle'
+            neo4j_out_path = path.join(g_example_query_each_folder_fmt.format(str(query_id)), neo4j_out_name)
+            query_5_neo4j_1(neo4j_driver, neo4j_out_path)
+            logging.critical('[main] example_query_5 done in %s secs.' % str(time.time() - timer_start))
 
         # TODO
         # THIS CMD SHOULD NOT BE USED OUTSIDE THE DEMO

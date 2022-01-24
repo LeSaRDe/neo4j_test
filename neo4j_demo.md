@@ -256,5 +256,11 @@ Query incoming degrees of infected people at a given time point.
   - Running Time: 0.4s
   - /project/biocomplexity/mf3jh/example_queries/query_1
 - (2) What are the states that are transitioned to by males or females that have the activity of shopping on their incoming edges?
-  - Running Time: 
+  - Running Time: 18s
   - /project/biocomplexity/mf3jh/example_queries/query_2
+- (3) What are the states that are transitioned to by males between 75 and 90 or by females 32 to 39 where the other node of an edge, if there is an edge, is activity work?
+  - Running Time: 47s
+  - /project/biocomplexity/mf3jh/example_queries/query_3
+- (5) What are the household IDs of households where the number of people in the household is at least 6 and there is at least one child between 8 and 14?
+  - Running Time: 0.7s
+  - /project/biocomplexity/mf3jh/example_queries/query_5
