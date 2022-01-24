@@ -126,6 +126,9 @@ Two different methods were tried.
   - Creating indexes after creating nodes is very fast in this case, though the running time may vary for larger data. 
 - `apoc`, though also uses parallelization, processes data in some different ways. 
 - TICSMTC: https://github.com/LeSaRDe/neo4j_test/blob/master/neo4j_ops.py
+- Using VA Data:
+  - Loading in nodes: $\sim 5$ minutes using Method (B).
+  - Loading in initial edges: 
 
 
 ## 9. Create Edges for Initial Contact Network

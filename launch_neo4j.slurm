@@ -17,4 +17,4 @@ source activate my_venv
 conda deactivate
 source activate my_venv
 
-./launch_neo4j.sh /project/biocomplexity/mf3jh/neo4j_workspace /project/biocomplexity/mf3jh/neo4j_workspace/img/neo4j_community.sif
+./launch_neo4j.sh /project/biocomplexity/mf3jh/neo4j_workspace_va /project/biocomplexity/mf3jh/neo4j_img/neo4j_community.sif

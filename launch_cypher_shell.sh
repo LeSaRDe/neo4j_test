@@ -8,7 +8,7 @@ if [ "$#" -lt 1 ]
     echo "[RUN CYPHER-SHELL] USAGE:"
     echo "[RUN CYPHER-SHELL] launch_cypher_shell.sh [NEO4J SIF IMAGE PATH]"
     echo "[RUN CYPHER-SHELL] Exits."
-    exit -1
+    exit 255
 fi
 
 # SET NEO4J SIF IMAGE PATH
@@ -17,7 +17,7 @@ if [ ! -f ${NEO4J_SIF} ]
   then
     echo "[RUN CYPHER-SHELL] NEO4J SIG IMAGE: ${NEO4J_SIF} dose not exist!"
     echo "[RUN CYPHER-SHELL] Exits."
-    exit -1
+    exit 255
 fi
 echo "[RUN CYPHER-SHELL] Neo4j SIF: ${NEO4J_SIF}"
 

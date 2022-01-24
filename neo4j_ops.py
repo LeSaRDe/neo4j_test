@@ -91,11 +91,13 @@ g_concurrency = 1
 
 g_neo4j_hostname_env_key = 'NEO4J_HOSTNAME'
 
-g_init_cn_folder = '/project/biocomplexity/mf3jh/neo4j_workspace/import/'
+g_state = 'va'
+
+g_init_cn_folder = '/project/biocomplexity/mf3jh/neo4j_workspace_%s/import/' % g_state
 # TODO
 # 'g_int_cn_folder' should be a folder under 'g_init_cn_folder'.
 # Modify 'g_int_cn_folder' to the desired folder.
-g_int_cn_folder = 'wy_replicate_0'
+g_int_cn_folder = '%s_replicate_0' % g_state
 g_int_cn_file_fmt = 'network_no_head_sorted_\d+'
 g_epihiper_output_folder = '/project/biocomplexity/mf3jh/epihiper_data/'
 
@@ -121,8 +123,15 @@ g_epihiper_output_folder = '/project/biocomplexity/mf3jh/epihiper_data/'
 # second command. And finally we add the CSV header, not the schema, back to the beginning of the sorted file.
 # With "--field-separator=','", each data record in the CSV file is separated into fields by comma,
 # and with "--key=1,5" the sorting is performed upon the fields from the 1st to the 5th.
-g_init_cn_file_name = 'wy_contact_network_config_m_5_M_40_a_1000_m-contact_0_with_lid_no_head_sorted.txt'
-g_person_trait_file_name = 'wy_persontrait_epihiper_no_head.txt'
+
+if g_state == 'wy':
+    g_init_cn_file_name = 'wy_contact_network_config_m_5_M_40_a_1000_m-contact_0_with_lid_no_head_sorted.txt'
+    g_person_trait_file_name = 'wy_persontrait_epihiper_no_head.txt'
+elif g_state == 'va':
+    g_init_cn_file_name = 'va_contact_network_config_m_5_M_40_a_1000_m-contact_0_with_lid_no_head_sorted.txt'
+    g_person_trait_file_name = 'va_persontrait_epihiper_no_head.txt'
+else:
+    raise Exception('[global variables] Invalid g_state!')
 
 g_init_cn_path = path.join(g_init_cn_folder, g_init_cn_file_name)
 g_person_trait_path = path.join(g_init_cn_folder, g_person_trait_file_name)

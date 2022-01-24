@@ -11,7 +11,7 @@ if [ "$#" -lt 2 ]
     echo "[RUN NEO4J] USAGE:"
     echo "[RUN NEO4J] launch_neo4j.sh [WORK FOLDER] [NEO4J SIF IMAGE PATH] [NEO4J INSTANCE NAME]"
     echo "[RUN NEO4J] Exits."
-    exit -1
+    exit 255
 fi
 
 # SET WORK FOLDER
@@ -26,7 +26,7 @@ if [ ! -d ${WORK_FOLDER} ]
   then
     echo "[RUN NEO4J] WORK FOLDER: ${WORK_FOLDER} dose not exist!"
     echo "[RUN NEO4J] Exits."
-    exit -1
+    exit 255
 fi
 echo "[RUN NEO4J] Work Folder: ${WORK_FOLDER}"
 
@@ -36,7 +36,7 @@ if [ ! -f ${NEO4J_SIF} ]
   then
     echo "[RUN NEO4J] NEO4J SIG IMAGE: ${NEO4J_SIF} dose not exist!"
     echo "[RUN NEO4J] Exits."
-    exit -1
+    exit 255
 fi
 echo "[RUN NEO4J] Neo4j SIF: ${NEO4J_SIF}"
 
