@@ -1,4 +1,4 @@
-# Neo4j Demo
+# Analysis on EpiHiper Simulation Results Using Neo4j
 
 ## 0. Motivation
 EpiHiper works on contact networks and output modified contact networks as well as some addditional simulation results. Can we maintain these data into data structures and make analyses on the networks and results over time? A series of questions need to be answered such as how to store the contact networks (both in memory and disc), how to make queries over the networks, how to handle the time series, can we do these efficiently, and etc. 
