@@ -169,7 +169,7 @@ Similar to creating nodes.
     |va_init_cn_split_7|37188863|3.2 hours|
     |va_init_cn_split_8|37188863|5.6 hours|
     |va_init_cn_split_9|37188854|3.6 hours|
-  - !!!CAUTION!!!
+  - CAUTION!
     When using parallelized Method (B) with partitioned edge files, if no indexes are defined before loading in data, it is very likely to run into dead lock. Though, so far it is unknown to us why this dead lock happens.
 
 ## 10. Create Edges for Intermediate Contact Networks
