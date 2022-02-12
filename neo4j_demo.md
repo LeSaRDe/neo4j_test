@@ -1,4 +1,4 @@
-# Analysis on EpiHiper Simulation Results Using Neo4j
+# Neo4j Demo
 
 ## 0. Motivation
 EpiHiper works on contact networks and output modified contact networks as well as some addditional simulation results. Can we maintain these data into data structures and make analyses on the networks and results over time? A series of questions need to be answered such as how to store the contact networks (both in memory and disc), how to make queries over the networks, how to handle the time series, can we do these efficiently, and etc. 
@@ -127,17 +127,50 @@ Two different methods were tried.
 - `apoc`, though also uses parallelization, processes data in some different ways. 
 - TICSMTC: https://github.com/LeSaRDe/neo4j_test/blob/master/neo4j_ops.py
 - Using VA Data:
-  - Loading in nodes: $\sim 5$ minutes using Method (B).
-  - Loading in initial edges: 
-
+  - Method (B): $\sim 5$ minutes.
+- Using NY Data:
+  - Method (B): $\sim 35$ minutes.
 
 ## 9. Create Edges for Initial Contact Network
 Similar to creating nodes. 
 - Some Results:
   - Method (B): $\sim 15$ minutes.
   - Method (A): When loading in VA data, it took more than $30$ hours using a single thread. 
-  - Method (B): For the same VA data, it took about $4.5$ hours. 
+  - Method (B) (Neo4j Enterprise): For the same VA data, it took about $4.5$ hours. 
+  - Using VA Data:
+    - Method (B) (Neo4j Community): $\sim 11$ hours.
+  - Parallelize Method (B) with partitioned edge files: WY initial contact network
+    
+    We sort the edge file before partitioning. 
+  
+    | CN Partitioned Edge File | Lines  | Time |
+    |---|---|---|
+    |wy_init_cn_split_0|2168577|10 min|
+    |wy_init_cn_split_1|2168578|11 min|
+    |wy_init_cn_split_2|2168578|10 min|
+    |wy_init_cn_split_3|2168578|9 min|
+    |wy_init_cn_split_4|2168578|9 min|
+    |wy_init_cn_split_5|2168578|4 min|
+    |wy_init_cn_split_6|2168578|8 min|
+    |wy_init_cn_split_7|2168578|4 min|
+    |wy_init_cn_split_8|2168578|4 min|
+    |wy_init_cn_split_9|2168369|4 min|
+  - Parallelize Method (B) with partitioned edge files: VA initial contact network
 
+    | CN Partitioned Edge File | Lines  | Time |
+    |---|---|---|
+    |va_init_cn_split_0|37188862|9.2 hours|
+    |va_init_cn_split_1|37188863|8.4 hours|
+    |va_init_cn_split_2|37188863|7.3 hours|
+    |va_init_cn_split_3|37188863|5 hours|
+    |va_init_cn_split_4|37188863|5 hours|
+    |va_init_cn_split_5|37188863|8 hours|
+    |va_init_cn_split_6|37188863|5.7 hours|
+    |va_init_cn_split_7|37188863|3.2 hours|
+    |va_init_cn_split_8|37188863|5.6 hours|
+    |va_init_cn_split_9|37188854|3.6 hours|
+  - !!!CAUTION!!!
+    When using parallelized Method (B) with partitioned edge files, if no indexes are defined before loading in data, it is very likely to run into dead lock. Though, so far it is unknown to us why this dead lock happens.
 
 ## 10. Create Edges for Intermediate Contact Networks
 Similar as before. 
