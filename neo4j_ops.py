@@ -91,7 +91,7 @@ g_concurrency = 1
 
 g_neo4j_hostname_env_key = 'NEO4J_HOSTNAME'
 
-g_state = 'va'
+g_state = 'wy'
 
 g_init_cn_folder = '/project/biocomplexity/mf3jh/neo4j_workspace_%s/import/' % g_state
 # TODO
@@ -130,6 +130,9 @@ if g_state == 'wy':
 elif g_state == 'va':
     g_init_cn_file_name = 'va_contact_network_config_m_5_M_40_a_1000_m-contact_0_with_lid_no_head_sorted.txt'
     g_person_trait_file_name = 'va_persontrait_epihiper_no_head.txt'
+elif g_state == 'ny':
+    g_init_cn_file_name = 'ny_contact_network_config_m_5_M_40_a_1000_m-contact_0_with_lid_no_head_sorted.txt'
+    g_person_trait_file_name = 'ny_persontrait_epihiper_no_head.txt'
 else:
     raise Exception('[global variables] Invalid g_state!')
 
@@ -1748,6 +1751,34 @@ if __name__ == '__main__':
             neo4j_out_path = path.join(g_example_query_each_folder_fmt.format(str(query_id)), neo4j_out_name)
             query_5_neo4j_1(neo4j_driver, neo4j_out_path)
             logging.critical('[main] example_query_5 done in %s secs.' % str(time.time() - timer_start))
+
+        # TEST FOR PARALLEL LOADING USING APOC
+        elif cmd == 'parallel_apoc':
+            logging.critical('[main] parallel_apoc starts.')
+            timer_start = time.time()
+            cn_split_file_name = sys.argv[2]
+            if cn_split_file_name is None or cn_split_file_name == '' or len(cn_split_file_name) <= 0:
+                raise Exception('[main] parallel_apoc: Failed to get cn_split_file_name!')
+            logging.critical('[main] cn_split_file_name = %s' % cn_split_file_name)
+            batch_size = 500000
+            method = 'apoc'
+            occur = -1
+            create_edges(cn_split_file_name, occur, neo4j_driver, batch_size, method)
+            logging.critical('[main] parallel_apoc done in %s secs.' % str(time.time() - timer_start))
+
+        # TEST FOR SERIAL LOADING USING APOC WITH MULTIPLE PARTITIONS
+        elif cmd == 'serial_apoc':
+            logging.critical('[main] serial_apoc starts.')
+            timer_start = time.time()
+            batch_size = 500000
+            method = 'apoc'
+            occur = -1
+            l_split_idx = [i for i in range(10)]
+            for split_idx in l_split_idx:
+                cn_split_file_name = 'wy_init_cn_split_' + str(split_idx)
+                logging.critical('[main] serial_apoc: loading in %s' % cn_split_file_name)
+                create_edges(cn_split_file_name, occur, neo4j_driver, batch_size, method)
+            logging.critical('[main] serial_apoc done in %s secs.' % str(time.time() - timer_start))
 
         # TODO
         # THIS CMD SHOULD NOT BE USED OUTSIDE THE DEMO
