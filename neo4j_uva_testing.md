@@ -1,7 +1,7 @@
-## Rivanna Eight Special Large Local Storage Machines
+## Neo4j Enterprise Testing on Rivanna Large Local Storage Machines
 
 **1. Hardware & Environment**
-- Machines: *udc-aj36-[1-4]c[0-1]*
+- Machines: 8 in total; *udc-aj36-[1-4]c[0-1]*
 - Local storage info: e.g. on *udc-aj36-4c0*
   
     |NAME|MAJ:MIN|RM|SIZE|RO|FSTYPE|MOUNTPOINT|UUID|MODEL|ROTA|DISC-MAX|SERIAL|VENDOR|
