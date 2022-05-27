@@ -1,5 +1,5 @@
 Bootstrap: docker
-From: neo4j:latest
+From: neo4j:enterprise
 
 %post
 chmod -R 777 /var/lib/neo4j
@@ -10,9 +10,11 @@ echo "dbms.security.auth_enabled=false" >> /var/lib/neo4j/conf/neo4j.conf
 echo "dbms.security.procedures.unrestricted=my.extensions.example,my.procedures.*,apoc.*" >> /var/lib/neo4j/conf/neo4j.conf
 echo "dbms.security.procedures.allowlist=apoc.coll.*,apoc.load.*,gds.*,apoc.*" >> /var/lib/neo4j/conf/neo4j.conf
 echo "apoc.import.file.enabled=true" >> /var/lib/neo4j/conf/neo4j.conf
-echo "dbms.memory.heap.initial_size=10g" >> /var/lib/neo4j/conf/neo4j.conf
-echo "dbms.memory.heap.max_size=10g" >> /var/lib/neo4j/conf/neo4j.conf
-echo "dbms.memory.pagecache.size=15g" >> /var/lib/neo4j/conf/neo4j.conf
+echo "dbms.memory.heap.initial_size=11800m" >> /var/lib/neo4j/conf/neo4j.conf
+echo "dbms.memory.heap.max_size=11800m" >> /var/lib/neo4j/conf/neo4j.conf
+echo "dbms.memory.pagecache.size=12000m" >> /var/lib/neo4j/conf/neo4j.conf
+echo "dbms.jvm.additional=-XX:+ExitOnOutOfMemoryError" >> /var/lib/neo4j/conf/neo4j.conf
+
 
 %startscript
-tini -s -g -- /docker-entrypoint.sh neo4j
+neo4j console

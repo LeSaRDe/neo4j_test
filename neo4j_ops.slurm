@@ -18,7 +18,7 @@ conda deactivate
 source activate my_venv
 
 # SET NEO4J_HOSTNAME
-export NEO4J_HOSTNAME="udc-aj37-3c1"
+export NEO4J_HOSTNAME="udc-aj37-16c1"
 
 # CREATE DB
 #python neo4j_ops.py "neo4j_driver->create_db->create_constraints->create_indexes"
@@ -26,8 +26,8 @@ export NEO4J_HOSTNAME="udc-aj37-3c1"
 
 # CREATE INITIAL CONTACT NETWORK
 #python neo4j_ops.py "neo4j_driver->create_nodes"
-#python neo4j_ops.py "neo4j_driver->create_init_cn_edges"
-python neo4j_ops.py "neo4j_driver->parallel_apoc" wy_init_cn_split_${SLURM_ARRAY_TASK_ID}
+python neo4j_ops.py "neo4j_driver->create_init_cn_edges"
+#python neo4j_ops.py "neo4j_driver->parallel_apoc" wy_init_cn_split_${SLURM_ARRAY_TASK_ID}
 #python neo4j_ops.py "neo4j_driver->serial_apoc"
 
 # CREATE INTERMEDIATE CONTACT NETWORKS

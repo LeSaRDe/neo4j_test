@@ -69,7 +69,7 @@ fi
 # Set the following two lines to "true" to expose "conf" and "metrics"
 # respectively when needed.
 EN_CONF_EXP=false
-EN_METRICS_EXP=false
+EN_METRICS_EXP=true
 
 EXP_DATA=${WORK_FOLDER}data
 EXP_PLUGINS=${WORK_FOLDER}plugins

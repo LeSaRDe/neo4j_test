@@ -86,20 +86,22 @@ g_neo4j_edition = 'community'
 # TODO
 # This value is the number of threads available for concurrency.
 # Can be modified case by case.
-# g_concurrency = math.ceil(multiprocessing.cpu_count() * 0.8)
-g_concurrency = 1
+g_concurrency = math.ceil(multiprocessing.cpu_count() * 0.8)
+# g_concurrency = 1
 
 g_neo4j_hostname_env_key = 'NEO4J_HOSTNAME'
 
 g_state = 'wy'
 
-g_init_cn_folder = '/project/biocomplexity/mf3jh/neo4j_workspace_%s/import/' % g_state
+
+g_init_cn_folder = '/project/biocomplexity/mf3jh/neo4j_workspace_%s_test/import/' % g_state
 # TODO
 # 'g_int_cn_folder' should be a folder under 'g_init_cn_folder'.
 # Modify 'g_int_cn_folder' to the desired folder.
 g_int_cn_folder = '%s_replicate_0' % g_state
 g_int_cn_file_fmt = 'network_no_head_sorted_\d+'
 g_epihiper_output_folder = '/project/biocomplexity/mf3jh/epihiper_data/'
+
 
 # !!!CAUTION!!!
 # Make sure that the files specified by 'g_init_cn_file_name', 'g_person_trait_file_name' and 'g_int_cn_file_fmt' are
