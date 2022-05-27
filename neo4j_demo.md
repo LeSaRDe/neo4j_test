@@ -109,16 +109,27 @@ Typically, `cypher-shell` is used for accessing Neo4j servers. There are two ste
 
 ## 8. Create Nodes
 Two different methods were tried. 
-- (A) Use `CREATE` with/without multithreading. Commit batch by batch. 
-- (B) Use `apoc.periodic.iterate()` and `apoc.load.csv()` with parallelization. 
+- (A) First, we sort the input node/edge file; and second, use `CREATE` with/without multithreading. Commit batch by batch. 
+- (B) First, we sort the input node/edge file; and second, use `apoc.periodic.iterate()` and `apoc.load.csv()` with parallelization. 
+- (C) First, we sort the input node/edge file; second, we split the sorted file into a specific number of partitions; and third, we use multiple physical machines in parallel, and on each machine we apply Method (B) to a partition.
+- (D) Same as Method (C) except that we do not define indexed before loading.
 - Experimental Settings:
   - WY data: /project/bii_nssac/COVID-19_USA_EpiHiper/rivanna/20211020-network_query/
-  - Data description: https://github.com/NSSAC/EpiHiper-network_analytics 
-  - Number of nodes: $548,603$
-  - Number of edges in the initial contact network: $21,685,569$
-  - $32$ Threads (Rivanna computing node, exclusive mode).
-  - Batch size: $100,000$
-- Some Results:
+    - Data description: https://github.com/NSSAC/EpiHiper-network_analytics 
+    - Number of nodes: $548,603$
+    - Number of edges in the initial contact network: $21,685,569$
+    - $32$ Threads (Rivanna computing node, exclusive mode).
+    - Batch size: $100,000$
+  - VA data: 
+    - Number of nodes: $7,688,060$
+    - Number of edges in the initial contact network: $371,888,621$
+  - NY data:
+    - Number of nodes: $18,120,753$
+    - Number of edges in the initial contact network: $782,828,605$
+  - CA data:
+    - Number of nodes: $35,516,054$
+    - Number of edges in the initial contact network: $1,402,087,302$
+- Using WY Data:
   - With/without predefined indexes, running times are similar. 
   - Method (A): $< 1$ min (no significant difference between `cypher-shell` and Python), $30 \sim 60$ seconds for each thread. 
   - Method (A) in a single thread: $> 70$ seconds. 
@@ -134,14 +145,11 @@ Two different methods were tried.
 ## 9. Create Edges for Initial Contact Network
 Similar to creating nodes. 
 - Some Results:
-  - Method (B): $\sim 15$ minutes.
-  - Method (A): When loading in VA data, it took more than $30$ hours using a single thread. 
-  - Method (B) (Neo4j Enterprise): For the same VA data, it took about $4.5$ hours. 
-  - Using VA Data:
-    - Method (B) (Neo4j Community): $\sim 11$ hours.
-  - Parallelize Method (B) with partitioned edge files: WY initial contact network
-    
-    We sort the edge file before partitioning. 
+  - Method (B): Using WY data, $\sim 15$ minutes.
+  - Method (A): Using VA data, more than $30$ hours using a single thread. 
+  - Method (B) (reported by Neo4j using Enterprise): Using VA data, $\sim 4.5$ hours. 
+  - Method (B) (using Community): Using VA data, $\sim 11$ hours.
+  - Method (C): Using WY data,
   
     | CN Partitioned Edge File | Lines  | Time |
     |---|---|---|
@@ -155,7 +163,7 @@ Similar to creating nodes.
     |wy_init_cn_split_7|2168578|4 min|
     |wy_init_cn_split_8|2168578|4 min|
     |wy_init_cn_split_9|2168369|4 min|
-  - Parallelize Method (B) with partitioned edge files: VA initial contact network
+  - Method (C): Using VA data,
 
     | CN Partitioned Edge File | Lines  | Time |
     |---|---|---|
@@ -169,14 +177,18 @@ Similar to creating nodes.
     |va_init_cn_split_7|37188863|3.2 hours|
     |va_init_cn_split_8|37188863|5.6 hours|
     |va_init_cn_split_9|37188854|3.6 hours|
-  - CAUTION!
-    When using parallelized Method (B) with partitioned edge files, if no indexes are defined before loading in data, it is very likely to run into dead lock. Though, so far it is unknown to us why this dead lock happens.
+  - Method (D): Using WY data,
+    - **CAUTION!!!**
+      When using Method (D), it is very likely to run into dead lock. Though, so far it is unknown to us why this dead lock happens.
+    - **CAUTION!!!**
+      If we set the number of partitions to be 1 (i.e. no spliting), then Method (D) is very likely to overwhelm the JVM with our current settings. A lot of "stop-the-world" pauses occurred. 
+
 
 ## 10. Create Edges for Intermediate Contact Networks
 Similar as before. 
 - A key concept capturing the time series is the `occur` attribute at edges. `occur = -1` for the initial contact network, and `occur > 0` for intermediate networks.
 - Some Results:
-  - Method (B): $\sim 1.7$ hours for loading in the first 5 intermediate contact networks in sequence, and $\sim 5.8$ hours for loading in from $5$ to $15$. 
+  - Method (B): Using WY data, $\sim 1.7$ hours for loading in the first 5 intermediate contact networks in sequence, and $\sim 5.8$ hours for loading in from $5$ to $15$. 
   
     | CN Edge File | Lines  | Time |
     |---|---|---|
