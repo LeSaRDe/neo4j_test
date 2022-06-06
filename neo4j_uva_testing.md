@@ -246,8 +246,9 @@
 - Start an interactive job on a regular computing node. 
 - Use [*launch_cypher_shell.sh*](https://github.com/LeSaRDe/neo4j_test/blob/master/launch_cypher_shell.sh) to start a shell inside the container running the Neo4j image. 
 - In the container's shell, use `cypher-shell -a udc-aj36-4c0` to connect the Neo4j server running on *udc-aj36-4c0*.
-- After entered the Cypher shell, use `show databases` to list all existing databases.
-- **Questions**
+- After connecting to the DB server running on *udc-aj36-4c0*, use `create database contacts` to create the database named *contacts*. Without explicitly creating the database, it will not automatically be created. 
+- Then we are able to see the database become online using `show databases` to list all existing databases.
+- <s>**Questions**
   - The result of `show databases` was
   
     |name|aliases|access|address|role|requestedStatus|currentStatus|error|default|home|
@@ -255,4 +256,19 @@
     |"neo4j"|[]|"read-write"|"localhost:7687"|"standalone"|"online"|"online"|""|TRUE|TRUE|
     |"system"|[]|"read-write"|"localhost:7687"|"standalone"|"online"|"online"|""|FALSE|FALSE|
 
-    There was no the loaded database named *contacts*. Why?
+    There was no the loaded database named *contacts*. Why?</s>
+- After the database creation, we can create constraints and indexes as normal. Creating indexes on node properties took less than 1 minute for each. However, creating indexes on edge properties took much longer. For example, typically, creating the index for the *duration* property for each time stamp label (e.g. *CONTACT_0* and *CONTACT_1*) took about 20 minutes. 
+- **Question**
+  - Can we make it faster when creating indexes for edge properties?
+  - Is there any approach to create an *array-like* property for the time stamps with indexing instead of using multiple time stamp labels?
+- A sample query
+  - Cypher query string:
+    ```
+    match ()-[r]->(n)
+    where (r.src_act="1:2") and 
+          ((n.gender=2 and n.age>=21 and n.age<=55) 
+          or 
+          (n.gender=1 and n.age>=56 and n.age<=85))
+    return distinct n.pid
+    ```
+  - Running time varies from a couple of to a few minutes when chaning the ranges of ages. 
