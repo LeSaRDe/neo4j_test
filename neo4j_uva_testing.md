@@ -231,9 +231,11 @@
     8106473664 properties
     ```
 - Space consumption after loading
-  - *data* folder: 190GB
+  - *data* folder: 190GB (without indexes)
+  - *data* folder: 340GB (with all indexes, i.e. 7 for nodes and 6 for edges on 2 time stamp labels)
   - raw data size: 2.6GB + 49GB + 43GB = 94.6GB
-  - Expansion ratio after loading: 190GB / 94.6GB = 2.00
+  - Expansion ratio after loading without indexes: 190GB / 94.6GB = 2.00
+  - Expansion ratio with indexes: 340GB / 94.6GB = 3.59
 
 - **Questions**
   - There are 35,516,052 nodes in the testing data. In the output log of loading, it states that "Estimated number of nodes: 38.42 M". These two numbers do not match. Why?
