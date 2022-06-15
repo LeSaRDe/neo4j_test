@@ -53,7 +53,12 @@
     dbms.memory.pagecache.size=331500m
     dbms.jvm.additional=-XX:+ExitOnOutOfMemoryError
     ```
-
+- Memory Consumption on Idling
+  - ~27GB
+- Neo4j Plugins:
+  - APOC
+  - GDS
+    - **Question**: How could we have the licence key file to unlock the Enterprise Edition of GDS? (https://neo4j.com/docs/graph-data-science/current/installation/installation-enterprise-edition/)
 
 **2. Testing for Loading**
 - Testing data:
@@ -236,13 +241,22 @@
   - raw data size: 2.6GB + 49GB + 43GB = 94.6GB
   - Expansion ratio after loading without indexes: 190GB / 94.6GB = 2.00
   - Expansion ratio with indexes: 340GB / 94.6GB = 3.59
-
+- Time needed to fully start Neo4j with data
+  - After the loading and indexing, without further operations, it takes 1-2 minutes before *cypher-shell* is able to connect to the server. However, after some operations including using projections, shutting down and restarting, it would take much longer to start. And we observed many logs like this:
+    ```
+    2022-06-15 14:41:48.727+0000 INFO  [o.n.k.i.i.s.GenericNativeIndexProvider] [contacts/0b8ad418] Schema index cleanup job started: descriptor=Index( id=16, name='idx_rel_trg_act_1', type='GENERAL BTREE', schema=-[:Relationship Type[0] {PropertyKey[8]}]-, indexProvider='native-btree-1.0' ), indexFile=/data/databases/contacts/schema/index/native-btree-1.0/16/index-16
+    ```
+    - **Question**: Why did this happen? Did we do anything wrong?
+  - About 5 or more minutes observing the memory consumed by the server increasing.
+- Memory consumption after loading and indexing
+  - After the server starts, without any action, the memory consumption keeps increasing up to more than 360GB. And this amount almost hits the memory cap of our computing node. What is even worse is that in this situation we couldn't switch to our database *contacts* using `:use contacts`.
+    - **Question**: Does this sound normal? How much memory should we install in the machine to have this server run without memory stalls? 
 - **Questions**
   - There are 35,516,052 nodes in the testing data. In the output log of loading, it states that "Estimated number of nodes: 38.42 M". These two numbers do not match. Why?
   - Similarly, the numbers of edges in the initial contact network and the intermediate contact network are 1,402,087,300 and 1,205,361,116 respectively. These numbers do not match with what is stated in the log (i.e. "Estimated number of relationships: 3.03 G") either. 
 
 
-**3. Testing for Neo4j DB Running**
+**3. Testing for Neo4j Data Loading and Indexing**
 - Keep using the specified computing node for loading, i.e. *udc-aj36-4c0*. 
 - Use [*launch_neo4j.sh*](https://github.com/LeSaRDe/neo4j_test/blob/master/launch_neo4j.sh) on this node to start the Neo4j server. 
 - Start an interactive job on a regular computing node. 
@@ -263,6 +277,8 @@
 - **Question**
   - Can we make it faster when creating indexes for edge properties?
   - Is there any approach to create an *array-like* property for the time stamps with indexing instead of using multiple time stamp labels?
+
+**4. Testing for Queries**
 - A sample query
   - Cypher query string:
     ```
@@ -274,3 +290,20 @@
     return distinct n.pid
     ```
   - Running time varies from a couple of to a few minutes when chaning the ranges of ages. 
+
+
+**5. Testing for GDS**
+- Some background about Neo4j GDS
+  - Two essential items in GDS are: 1) workflow of algorithms, and 2) graph projections.
+  - Graph projections are in-memory data structures of graphs and relevant informantion. Projections are named by users, and managed by a so-called *graph catelog* object. Projections stay in memory, and can be retrieved by their names. 
+  - Graph projections can be created by *native projections* or *Cypher projections*. The former one has better performance, while the latter one is more flexible. 
+  - Using GDS can be both CPU and memory consuming, and thus doing memory estimation beforehand is necessary.
+- Create Native Projections
+  - Example: Create a projection for the initial contact network, named *init_cn*, on nodes with the label *PERSON* and edges with the label *CONTACT_0*.
+  - Command:
+    ```
+    call gds.graph.project('init_cn', 'PERSON', 'CONTACT_0') yield graphName AS graph, nodeProjection, nodeCount AS nodes, relationshipCount AS rels
+    ```
+  - Running time: ~5 minutes
+  - **Question**
+    - Interestingly, after creating a projection, the memory consumed by the server doesn't increase, at least not significantly. According to the description of projections, they are in-memory data structures, then why did we not see memory increase?
