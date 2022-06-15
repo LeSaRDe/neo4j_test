@@ -249,7 +249,7 @@
     - **Question**: Why did this happen? Did we do anything wrong?
   - About 5 or more minutes observing the memory consumed by the server increasing.
 - Memory consumption after loading and indexing
-  - After the server starts, without any action, the memory consumption keeps increasing up to more than 360GB. And this amount almost hits the memory cap of our computing node. What is even worse is that in this situation we couldn't switch to our database *contacts* using `:use contacts`.
+  - After the server starts, without any action, the memory consumption keeps increasing. Typically it climbs higher than 300GB, and it can hit more than 360GB. And this amount almost hits the memory cap of our computing node. What is even worse is that in this situation we couldn't switch to our database *contacts* using `:use contacts`.
     - **Question**: Does this sound normal? How much memory should we install in the machine to have this server run without memory stalls? 
 - **Questions**
   - There are 35,516,052 nodes in the testing data. In the output log of loading, it states that "Estimated number of nodes: 38.42 M". These two numbers do not match. Why?
