@@ -319,7 +319,7 @@
   - *udc-aj36-3c0*
 
 **2. Testing Data**
-   - NY real data
+   - NY data
    - Nodes: 18,120,752; 1.3GB
    - Initial Edges: 782,828,604; 28GB
    - Intermediate #1 Edges: 656,138,932; 24GB
@@ -531,4 +531,4 @@
            ORDER BY index
       ```
     - **Question**: W.r.t. the parallelism, I noticed that there are 15 working threads in the running state. I didn't set up the `concurrency` parameter for `gds.allShortestPaths.dijkstra.stream`, and by default its value is supposed to be $4$ (according to the document: https://neo4j.com/docs/graph-data-science/current/algorithms/dijkstra-single-source/). However, it seems more than $4$ threads working for this algorithm and less than the number of logic cores offered by the machine (i.e. $40$). Does this look normal?
-    - Running time: > 2 hours (hasn't run through once)
+    - Running time: > 4 hours (hasn't run through once)
