@@ -1,5 +1,7 @@
 ## Neo4j Enterprise Testing on Rivanna Large Local Storage Machines
 
+### Sync Testing with Neo4j on CA-Sized Data
+
 **1. Hardware & Environment**
 - Machines: 8 in total; *udc-aj36-[1-4]c[0-1]*
 - Local storage info: e.g. on *udc-aj36-4c0*
@@ -307,3 +309,226 @@
   - Running time: ~5 minutes
   - **Question**
     - Interestingly, after creating a projection, the memory consumed by the server doesn't increase, at least not significantly. According to the description of projections, they are in-memory data structures, then why did we not see memory increase?
+    - `gds.alpha.allShortestPaths.stream` doesn't support memory estimation?
+
+
+
+### Testing on NY Data
+
+**1. Machine**
+  - *udc-aj36-3c0*
+
+**2. Testing Data**
+   - NY real data
+   - Nodes: 18,120,752; 1.3GB
+   - Initial Edges: 782,828,604; 28GB
+   - Intermediate #1 Edges: 656,138,932; 24GB
+
+**3. Data Loading**
+  - `neo4j-admin import` Log:
+    ```
+    [NEO4J DATA LOADING] Starts.
+    [NEO4J DATA LOADING] Work Folder: /local/mf3jh/neo4j_workspace_ny//
+    [NEO4J DATA LOADING] Neo4j SIF: /local/mf3jh/neo4j_workspace_ny/img/neo4j_enterprise.sig
+    [NEO4J DATA LOADING] Data folder: /var/lib/neo4j/data => /local/mf3jh/neo4j_workspace_ny//data
+    [NEO4J DATA LOADING] Log folder: /var/lib/neo4j/logs => /local/mf3jh/neo4j_workspace_ny//logs
+    [NEO4J DATA LOADING] Log folder: /var/lib/neo4j/import => /local/mf3jh/neo4j_workspace_ny//import
+    [NEO4J DATA LOADING] Starting loading data...
+    Selecting JVM - Version:11.0.15+10, Name:OpenJDK 64-Bit Server VM, Vendor:Oracle Corporation
+    WARN: source file /var/lib/neo4j/import/edges_header.csv has been specified multiple times, this may result in unwanted duplicates
+    Neo4j version: 4.4.7
+    Importing the contents of these files into /var/lib/neo4j/data/databases/contacts:
+    Nodes:
+      [PERSON]:
+      /var/lib/neo4j/import/nodes_header.csv
+      /var/lib/neo4j/import/ny_persontrait_epihiper_pure_data.csv
+
+    Relationships:
+      CONTACT_1:
+      /var/lib/neo4j/import/edges_header.csv
+      /var/lib/neo4j/import/network_30_pure_data
+
+      CONTACT_0:
+      /var/lib/neo4j/import/edges_header.csv
+      /var/lib/neo4j/import/ny_contact_network_config_m_5_M_40_a_1000_m-contact_0_with_lid_pure_data.csv
+
+
+    Available resources:
+      Total machine memory: 376.4GiB
+      Free machine memory: 47.07GiB
+      Max heap memory : 31.00GiB
+      Processors: 20
+      Configured max memory: 310.8GiB
+      High-IO: true
+
+
+    Import starting 2022-06-16 16:00:19.419+0000
+      Estimated number of nodes: 19.95 M
+      Estimated number of node properties: 159.58 M
+      Estimated number of relationships: 1.68 G
+      Estimated number of relationship properties: 5.05 G
+      Estimated disk space usage: 119.3GiB
+      Estimated required memory usage: 1.241GiB
+
+    (1/4) Node import 2022-06-16 16:00:19.462+0000
+      Estimated number of nodes: 19.95 M
+      Estimated disk space usage: 1.824GiB
+      Estimated required memory usage: 1.241GiB
+    .......... .......... .......... .......... ..........   5% ∆1s 828ms
+    .......... .......... .......... .......... ..........  10% ∆808ms
+    .......... .......... .......... .......... ..........  15% ∆1s 3ms
+    .......... .......... .......... .......... ..........  20% ∆603ms
+    .......... .......... .......... .......... ..........  25% ∆802ms
+    .......... .......... .......... ...-...... ..........  30% ∆402ms
+    .......... .......... .......... .......... ..........  35% ∆0ms
+    .......... .......... .......... .......... ..........  40% ∆1ms
+    .......... .......... .......... .......... ..........  45% ∆1s 402ms
+    .......... .......... .......... .......... ..........  50% ∆201ms
+    .......... .......... .......... .......... ..........  55% ∆202ms
+    .......... .......... .......... .......... ..........  60% ∆201ms
+    .......... .......... .......... .......... ..........  65% ∆337ms
+    .......... .......... .......... .......... ..........  70% ∆1ms
+    .......... .......... .......... .......... ..........  75% ∆0ms
+    .......... .......... .......... .......... ..........  80% ∆0ms
+    .......... .......... .......... .......... ..........  85% ∆1ms
+    .......... .......... .......... .......... ..........  90% ∆0ms
+    .......... .......... .......... .......... ..........  95% ∆1ms
+    .......... .......... .......... .......... .......... 100% ∆0ms
+
+    Node import COMPLETED in 8s 493ms
+
+    (2/4) Relationship import 2022-06-16 16:00:27.956+0000
+      Estimated number of relationships: 1.68 G
+      Estimated disk space usage: 117.5GiB
+      Estimated required memory usage: 1.205GiB
+    .......... .......... .......... .......... ..........   5% ∆23s 487ms
+    .......... .......... .......... .......... ..........  10% ∆24s 842ms
+    .......... .......... .......... .......... ..........  15% ∆24s 818ms
+    .......... .......... .......... .......... ..........  20% ∆24s 824ms
+    .......... .......... .......... .......... ..........  25% ∆24s 420ms
+    .......... .......... .......... .......... ..........  30% ∆24s 823ms
+    .......... .......... .......... .......... ..........  35% ∆24s 17ms
+    .......... .......... .......... .......... ..........  40% ∆24s 227ms
+    .......... .......... .......... .......... ..........  45% ∆24s 229ms
+    .......... .......... .......... .......... ..........  50% ∆23s 876ms
+    .......... .......... .......... .......... ..........  55% ∆24s 419ms
+    .......... .......... .......... .......... ..........  60% ∆24s 218ms
+    .......... .......... .......... .......... ..........  65% ∆24s 915ms
+    .......... .......... .......... .......... ..........  70% ∆24s 37ms
+    .......... .......... .......... .......... ..........  75% ∆24s 418ms
+    .......... .......... .......... .......... ..........  80% ∆24s 22ms
+    .......... .......... .......... .......... ..........  85% ∆24s 445ms
+    .......... .......... .......... .......... ..........  90% ∆2s 634ms
+    .......... .......... .......... .......... ..........  95% ∆1ms
+    .......... .......... .......... .......... .......... 100% ∆0ms
+
+    Relationship import COMPLETED in 6m 56s 672ms
+
+    (3/4) Relationship linking 2022-06-16 16:07:24.628+0000
+      Estimated required memory usage: 1.182GiB
+    .......... .......... .......... .......... ..........   5% ∆12s 414ms
+    .......... .......... .......... .......... ..........  10% ∆7s 11ms
+    .......... .......... .......... .......... ..........  15% ∆7s 410ms
+    .......... .......... .......... .......... .........-  20% ∆400ms
+    .......... .......... .......... .......... ..........  25% ∆20s 419ms
+    .......... .......... .......... .......... ..........  30% ∆20s 621ms
+    .......... .......... .......... .......... ..........  35% ∆22s 613ms
+    .......... .......... .......... .......... ..........  40% ∆16s 415ms
+    .......... .......... .......... .......... ..........  45% ∆22s 619ms
+    .......... .......... .......... .......... ..........  50% ∆23s 815ms
+    .......... .......... .......... .......... ..........  55% ∆20s 213ms
+    .......... .......... .......... .......... .........-  60% ∆400ms
+    .......... .......... .......... .......... ..........  65% ∆22s 620ms
+    .......... .......... .......... .......... ..........  70% ∆32s 220ms
+    .......... .......... .......... .......... ..........  75% ∆24s 224ms
+    .......... .......... .......... .......... ..........  80% ∆16s 611ms
+    .......... .......... .......... .......... ..........  85% ∆26s 219ms
+    .......... .......... .......... .......... ..........  90% ∆16s 15ms
+    .......... .......... .......... .......... ..........  95% ∆15s 413ms
+    .......... .......... .......... .......... .......... 100% ∆29s 400ms
+
+    Relationship linking COMPLETED in 6m 35s 547ms
+
+    (4/4) Post processing 2022-06-16 16:14:00.176+0000
+      Estimated required memory usage: 1020MiB
+    .......... ......-... .......... ......-... .....-....   5% ∆1s 1ms
+    .....-.... .......... .......... .......... ..........  10% ∆5s 410ms
+    .......... .......... .......... .......... ..........  15% ∆5s 814ms
+    .......... .......... .......... .......... ..........  20% ∆6s 205ms
+    .......... .......... .......... .......... ..........  25% ∆6s 207ms
+    .......... .......... .......... .......... ..........  30% ∆6s 207ms
+    .......... .......... .......... .......... ..........  35% ∆6s 408ms
+    .......... .......... .......... .......... ..........  40% ∆6s 5ms
+    .......... .......... .......... .......... ..........  45% ∆5s 809ms
+    .......... .......... .......... .......... ..........  50% ∆6s 207ms
+    .......... .......... .......... .......... ..........  55% ∆6s 807ms
+    .......... .......... .......... .......... ..........  60% ∆6s 810ms
+    .......... .......... .......... .......... ..........  65% ∆6s 606ms
+    .......... .......... .......... .......... ..........  70% ∆6s 805ms
+    .......... .......... .......... .......... ..........  75% ∆6s 406ms
+    .......... .......... .......... .......... ..........  80% ∆6s 807ms
+    .......... .......... .......... .......... ..........  85% ∆6s 407ms
+    .......... .......... .......... .......... ..........  90% ∆6s 609ms
+    .......... .......... .......... .......... ..........  95% ∆6s 605ms
+    .......... .......... .......... .......... .......... 100% ∆4s 825ms
+
+    Post processing COMPLETED in 2m 19s 265ms
+
+
+    IMPORT DONE in 16m 591ms. 
+    Imported:
+      18120752 nodes
+      1438967534 relationships
+      4461868618 properties
+    Peak memory usage: 2.327GiB
+    ```
+  - *debug.log*
+    ```
+    2022-06-16 16:00:18.292+0000 INFO  [o.n.k.i.s.f.RecordFormatSelector] Record format not configured, selected default: RecordFormat:PageAlignedV4_3[AF4.3.0]
+    2022-06-16 16:00:18.850+0000 INFO  [o.n.i.b.ImportLogic] Import starting
+    2022-06-16 16:16:19.451+0000 INFO  [o.n.i.b.ImportLogic] Import completed successfully, took 16m 591ms. Imported:
+      18120752 nodes
+      1438967534 relationships
+      4461868618 properties
+    ```
+  - Space consumption
+    - After loading and DB creation: 
+      - *data* folder: 106GB
+      - Expansion ratio: $\frac{106}{1.3 + 28 + 24} = 1.98$ (same as that in the sync testing)
+  - Memory consumption
+    - After loading and DB creation
+      - Idle memory: ~28GB
+      - After fully started: ~62GB
+
+**4. Indexing and Constraints**
+  - Creating indexes on node properties is fast, while creating indexes on edge properties are slow. This is similar to what we observed in the sync testing. 
+  - Memory consumption
+    - ~240GB after the indexing (13 indexes) and restarting the server
+  - Space consumption
+    - After indexing
+      - *data* folder: 187GB
+      - Expansion ratio: $\frac{187}{1.3 + 28 + 24} = 3.5$
+
+**5. Testing for GDS**
+  - Create Native Projections
+    - Running time: ~1 minute
+  - Test single-source shortest path with Dijkstra
+    - Command:
+      ```
+      match (src:PERSON {hid: 0, county_fips: "36001", gender: 2, age_group: "a", pid: 0, age: 28})
+           CALL gds.allShortestPaths.dijkstra.stream('init_cn', {
+               sourceNode: src
+           })
+           YIELD index, sourceNode, targetNode, totalCost, nodeIds, costs, path
+           RETURN
+               index,
+               gds.util.asNode(sourceNode).name AS sourceNodeName,
+               gds.util.asNode(targetNode).name AS targetNodeName,
+               totalCost,
+               [nodeId IN nodeIds | gds.util.asNode(nodeId).name] AS nodeNames,
+               costs,
+               nodes(path) as path
+           ORDER BY index
+      ```
+    - **Question**: W.r.t. the parallelism, I noticed that there are 15 working threads in the running state. I didn't set up the `concurrency` parameter for `gds.allShortestPaths.dijkstra.stream`, and by default its value is supposed to be $4$ (according to the document: https://neo4j.com/docs/graph-data-science/current/algorithms/dijkstra-single-source/). However, it seems more than $4$ threads working for this algorithm and less than the number of logic cores offered by the machine (i.e. $40$). Does this look normal?
+    - Running time: > 2 hours (hasn't run through once)
