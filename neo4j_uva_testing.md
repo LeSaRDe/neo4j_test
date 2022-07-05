@@ -511,7 +511,15 @@
 
 **5. Testing for GDS**
   - Create Native Projections
-    - Running time: ~1 minute
+    - Command:
+      ```
+      call gds.graph.project('init_cn', 'PERSON', 'CONTACT_0')
+           yield graphName AS graph,
+           relationshipProjection AS knowsProjection,
+           nodeCount AS nodes,
+           relationshipCount AS rels;
+      ```
+    - Running time: can take several minutes, but not very long so far.
   - Test single-source shortest path with Dijkstra
     - Command:
       ```
@@ -531,4 +539,17 @@
            ORDER BY index
       ```
     - **Question**: W.r.t. the parallelism, I noticed that there are 15 working threads in the running state. I didn't set up the `concurrency` parameter for `gds.allShortestPaths.dijkstra.stream`, and by default its value is supposed to be $4$ (according to the document: https://neo4j.com/docs/graph-data-science/current/algorithms/dijkstra-single-source/). However, it seems more than $4$ threads working for this algorithm and less than the number of logic cores offered by the machine (i.e. $40$). Does this look normal?
+      - Answer: This may be caused by the overwhelmingly large amount of returned results. Consider the simpler test in the below.
     - Running time: > 17 hours (hasn't run through once)
+    - A simpler test
+      - Command:
+        ```
+        MATCH (src:PERSON {hid: 0, county_fips: "36001", gender: 2, age_group: "a", pid: 0, age: 28})
+           CALL gds.allShortestPaths.dijkstra.stream('init_cn', {sourceNode: src })
+           YIELD targetNode, totalCost 
+           RETURN avg(totalCost) as avgCost, count(*) as pathCount;
+        ```
+      - Returned results:
+        - avgCost: 6.681244537606326
+        - pathCount: 17,525,513
+      - Running time: a couple of minutes
