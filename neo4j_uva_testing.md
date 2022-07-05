@@ -55,6 +55,7 @@
     dbms.memory.pagecache.size=331500m
     dbms.jvm.additional=-XX:+ExitOnOutOfMemoryError
     ```
+  - Note on the above JVM memory settings: Neo4j suggests that we set 150GB for heap and 200GB for page cache. This is different from the above settings. **TODO**: We need to carefully investigate how these settings affect the performance of Neo4j.
 - Memory Consumption on Idling
   - ~27GB
 - Neo4j Plugins:
@@ -249,10 +250,12 @@
     2022-06-15 14:41:48.727+0000 INFO  [o.n.k.i.i.s.GenericNativeIndexProvider] [contacts/0b8ad418] Schema index cleanup job started: descriptor=Index( id=16, name='idx_rel_trg_act_1', type='GENERAL BTREE', schema=-[:Relationship Type[0] {PropertyKey[8]}]-, indexProvider='native-btree-1.0' ), indexFile=/data/databases/contacts/schema/index/native-btree-1.0/16/index-16
     ```
     - **Question**: Why did this happen? Did we do anything wrong?
+      - Answer: According to some comments from Neo4j, it'd be better to stop the database server safely without crude shut-down. We may need to look into this matter more carefully to make sure our current server stopping is appropriate enough, and no recovery is needed when starting up.
   - About 5 or more minutes observing the memory consumed by the server increasing.
 - Memory consumption after loading and indexing
   - After the server starts, without any action, the memory consumption keeps increasing. Typically it climbs higher than 300GB, and it can hit more than 360GB. And this amount almost hits the memory cap of our computing node. What is even worse is that in this situation we couldn't switch to our database *contacts* using `:use contacts`.
     - **Question**: Does this sound normal? How much memory should we install in the machine to have this server run without memory stalls? 
+      - Answer: A rough answer is that we do need large memory to handle the entire database in memory.
 - **Questions**
   - There are 35,516,052 nodes in the testing data. In the output log of loading, it states that "Estimated number of nodes: 38.42 M". These two numbers do not match. Why?
   - Similarly, the numbers of edges in the initial contact network and the intermediate contact network are 1,402,087,300 and 1,205,361,116 respectively. These numbers do not match with what is stated in the log (i.e. "Estimated number of relationships: 3.03 G") either. 
@@ -278,7 +281,15 @@
 - After the database creation, we can create constraints and indexes as normal. Creating indexes on node properties took less than 1 minute for each. However, creating indexes on edge properties took much longer. For example, typically, creating the index for the *duration* property for each time stamp label (e.g. *CONTACT_0* and *CONTACT_1*) took about 20 minutes. 
 - **Question**
   - Can we make it faster when creating indexes for edge properties?
+    - Answer: According to comments from Neo4j, this may depend on the performance of our disks. 
   - Is there any approach to create an *array-like* property for the time stamps with indexing instead of using multiple time stamp labels?
+    - Answer: Up to this point, we need to keep using our current method instead of *array-like* data types, because using copies for time points is more friendly for indexing and executing queries. Note that, on the other hand, keeping using our current method would need large storage and memory. 
+- Note for few-value attributes like `age`: According to comments from Neo4j, we should use labels instead of properties for those attributes to gain better efficacy and efficiency. And it'd be more efficient if this is done before the loading rather than after. Though, in case this has to be done after the loading, the following commands can be used:
+  ```
+  call apoc.periodic.iterate("MATCH (n:Person) WHERE n.gender = 1 RETURN id(n) as id", "MATCH (n) WHERE id(n)=id SET n:Male REMOVE n.gender", {batchSIze:50000, parallel:true});
+
+  call apoc.periodic.iterate("MATCH (n:Person) WHERE n.gender = 0 RETURN id(n) as id", "MATCH (n) WHERE id(n)=id SET n:Female REMOVE n.gender", {batchSIze:50000, parallel:true});
+  ```
 
 **4. Testing for Queries**
 - A sample query
@@ -290,6 +301,16 @@
           or 
           (n.gender=1 and n.age>=56 and n.age<=85))
     return distinct n.pid
+    ```
+  - Note: The above query string is a BAD example! Because it doesn't use the index for nodes and relationships. Instead, we should use the following:
+    ```
+    match (n:Person)
+    where 
+    ((n:Female and 21 <= n.age <=55) or
+    (n:Male and 56 <= n.age <=85))
+    and exists { ()-[:CONTACT_0|CONTACT_1 {src_act:"1:2"}]->(n) } // can be an index lookup if it selective enough
+    with distinct n
+    return n.pid
     ```
   - Running time varies from a couple of to a few minutes when chaning the ranges of ages. 
 
@@ -309,6 +330,7 @@
   - Running time: ~5 minutes
   - **Question**
     - Interestingly, after creating a projection, the memory consumed by the server doesn't increase, at least not significantly. According to the description of projections, they are in-memory data structures, then why did we not see memory increase?
+      - Answer: According to comments from Neo4j, only the algorithm execution takes temporarily additional memory.
     - `gds.alpha.allShortestPaths.stream` doesn't support memory estimation?
 
 
@@ -539,7 +561,8 @@
            ORDER BY index
       ```
     - **Question**: W.r.t. the parallelism, I noticed that there are 15 working threads in the running state. I didn't set up the `concurrency` parameter for `gds.allShortestPaths.dijkstra.stream`, and by default its value is supposed to be $4$ (according to the document: https://neo4j.com/docs/graph-data-science/current/algorithms/dijkstra-single-source/). However, it seems more than $4$ threads working for this algorithm and less than the number of logic cores offered by the machine (i.e. $40$). Does this look normal?
-      - Answer: This may be caused by the overwhelmingly large amount of returned results. Consider the simpler test in the below.
+      - Answer: This may be caused by the overwhelmingly large amount of returned results. Consider the simpler test in the below. 
+        - **Follow-up Question**: However, as shown in the results in the below, the number of returned paths is `17,525,513` which honestly could hardly be considered as an unbearable number on Rivanna machines. If running throught the single-source Dijkstra needs merely a couple of minutes, then what was the Neo4j server doing for the rest of time? Preparing the output? This doesn't sound reasonable. Further, we observed that during the runtime many threads kept running constantly while there was nearly no change in memory consumption. This looks like infinite loop. So what happened? 
     - Running time: > 17 hours (hasn't run through once)
     - A simpler test
       - Command:
