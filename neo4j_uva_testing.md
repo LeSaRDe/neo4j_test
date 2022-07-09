@@ -630,8 +630,12 @@
    - Nodes: 548,603; 38MB
    - Initial Edges: 21,685,570; 684MB
    - Intermediate #1 Edges: 21,685,570; 684MB
+
+**3. Runtime Resource Statistics**
+  - Memory: 65GB
+  - Disk: 4GB for the `data` folder
   
-**3. Testing for GDS**
+**4. Testing for GDS**
   - Create Native Projections
     - Running time: ~ 4 second
     - Single-Source Dijkstra returning counts
@@ -658,6 +662,9 @@
                index, sourceNode, targetNode, totalCost, nodeIds, costs, path
         ```
       - Running time: Several minutes
+      - Runtime resources:
+        - CPU: A sharp increase in a few cores, but declined to ~5% soon.
+        - Memory: no obvious increase
       - Note: 
         - What is different from the CA-based test was that the outputs came out to the screen immediately.  
   - Single-Source Dijkstra enumerating results with grouping aggregation
@@ -679,5 +686,7 @@
            ORDER BY index
       ```
     - Running time: A bit longer than the previous test but done in several minutes too.
+    - Runtime resources:
+      - Very similar to the previous test.
     - Note:
       - Similar to the previous test, the outputs came out immediately.
