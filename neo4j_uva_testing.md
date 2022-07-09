@@ -290,6 +290,48 @@
 
   call apoc.periodic.iterate("MATCH (n:Person) WHERE n.gender = 0 RETURN id(n) as id", "MATCH (n) WHERE id(n)=id SET n:Female REMOVE n.gender", {batchSIze:50000, parallel:true});
   ```
+- Creating constraints and indexes
+  - Contraint on the node property `pid`
+    ```
+    create constraint if not exists on (p:PERSON) assert p.pid is unique
+    ```
+  - Convert `home_latitude` and `home_longitude` to a single `point` data type:
+    ```
+    match (p:PERSON) call { with p set p.home = point({latitude:p.home_latitude, longitude:p.home_longitude}) remove p.home_latitude, p.home_longitude } in transactions of 1000000 rows
+    ```
+  - Indexs on some node properties:
+    - `age`:
+      ```
+      create index on :PERSON(age)
+      ```
+    - `age_group`:
+      ```
+      create index on :PERSON(age_group)
+      ```
+    - `county_fips`:
+      ```
+      create index on :PERSON(county_fips)
+      ```
+    - `home`:
+      ```
+      create index on :PERSON(home)
+      ```
+  - Indexes on some edge properties:
+    - `duration`:
+      ```
+      create index on :CONTACT_0(duration);
+      create index on :CONTACT_1(duration);
+      ```
+    - `sourceActivity`:
+      ```
+      create index on :CONTACT_0(sourceActivity);
+      create index on :CONTACT_1(sourceActivity);
+      ```
+    - `targetActivity`:
+      ``` 
+      create index on :CONTACT_0(targetActivity);
+      create index on :CONTACT_1(targetActivity);
+      ```
 
 **4. Testing for Queries**
 - A sample query
@@ -564,7 +606,7 @@
       - Answer: This may be caused by the overwhelmingly large amount of returned results. Consider the simpler test in the below. 
         - **Follow-up Question**: However, as shown in the results in the below, the number of returned paths is `17,525,513` which honestly could hardly be considered as an unbearable number on Rivanna machines. If running throught the single-source Dijkstra needs merely a couple of minutes, then what was the Neo4j server doing for the rest of time? Preparing the output? This doesn't sound reasonable. Further, we observed that during the runtime many threads kept running constantly while there was nearly no change in memory consumption. This looks like infinite loop. So what happened? 
     - Running time: > 17 hours (hasn't run through once)
-    - A simpler test
+    - Single-Source Dijkstra returning counts
       - Command:
         ```
         MATCH (src:PERSON {hid: 0, county_fips: "36001", gender: 2, age_group: "a", pid: 0, age: 28})
@@ -576,3 +618,66 @@
         - avgCost: 6.681244537606326
         - pathCount: 17,525,513
       - Running time: a couple of minutes
+
+
+### Testing on WY Data
+
+**1. Machine**
+  - *udc-aj36-3c0*
+
+**2. Testing Data**
+   - WY data
+   - Nodes: 548,603; 38MB
+   - Initial Edges: 21,685,570; 684MB
+   - Intermediate #1 Edges: 21,685,570; 684MB
+  
+**3. Testing for GDS**
+  - Create Native Projections
+    - Running time: ~ 4 second
+    - Single-Source Dijkstra returning counts
+      - Command:
+        ```
+        MATCH (src:PERSON {pid: 0})
+        CALL gds.allShortestPaths.dijkstra.stream('init_cn', {sourceNode: src })
+        YIELD targetNode, totalCost 
+        RETURN avg(totalCost) as avgCost, count(*) as pathCount;
+        ```
+      - Running time: ~ 3 seconds
+      - Returned results:
+        - avgCost: 6.56108795995262
+        - pathCount: 530,571
+    - Single-Source Dijkstra enumerating results
+      - Command:
+        ```
+        match (src:PERSON {pid: 0})
+           CALL gds.allShortestPaths.dijkstra.stream('init_cn', {
+               sourceNode: src
+           })
+           YIELD index, sourceNode, targetNode, totalCost, nodeIds, costs, path
+           RETURN
+               index, sourceNode, targetNode, totalCost, nodeIds, costs, path
+        ```
+      - Running time: Several minutes
+      - Note: 
+        - What is different from the CA-based test was that the outputs came out to the screen immediately.  
+  - Single-Source Dijkstra enumerating results with grouping aggregation
+    - Command:
+      ```
+      match (src:PERSON {pid: 0})
+           CALL gds.allShortestPaths.dijkstra.stream('init_cn', {
+               sourceNode: src
+           })
+           YIELD index, sourceNode, targetNode, totalCost, nodeIds, costs, path
+           RETURN
+               index,
+               gds.util.asNode(sourceNode).name AS sourceNodeName,
+               gds.util.asNode(targetNode).name AS targetNodeName,
+               totalCost,
+               [nodeId IN nodeIds | gds.util.asNode(nodeId).name] AS nodeNames,
+               costs,
+               nodes(path) as path
+           ORDER BY index
+      ```
+    - Running time: A bit longer than the previous test but done in several minutes too.
+    - Note:
+      - Similar to the previous test, the outputs came out immediately.
