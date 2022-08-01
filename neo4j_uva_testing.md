@@ -690,3 +690,70 @@
       - Very similar to the previous test.
     - Note:
       - Similar to the previous test, the outputs came out immediately.
+
+
+# Testing on VA Data
+
+**1. Machine**
+  - *udc-aj36-3c0*
+
+**2. Testing Data**
+   - VA data
+   - Nodes: 7,688,059; 559MB
+   - Initial Edges: 371,888,620; 13GB
+   - Intermediate #1 Edges: 371,888,620; 13GB
+
+**3. Runtime Resource Statistics**
+  - Memory: 65GB
+  - Disk: 60GB for the `data` folder
+
+**4. Testing for GDS**
+  - Create Native Projections
+    - Running time: ~ 1 minute
+    - Single-Source Dijkstra returning counts
+      - Command:
+        ```
+        MATCH (src:PERSON {pid: 0})
+        CALL gds.allShortestPaths.dijkstra.stream('init_cn', {sourceNode: src })
+        YIELD targetNode, totalCost 
+        RETURN avg(totalCost) as avgCost, count(*) as pathCount;
+        ```
+      - Running time: ~ 1 minute
+      - Returned results:
+        - avgCost: 6.202324008161933
+        - pathCount: 7,476,824
+    - Single-Source Dijkstra enumerating results
+      - Command:
+        ```
+        match (src:PERSON {pid: 0})
+           CALL gds.allShortestPaths.dijkstra.stream('init_cn', {
+               sourceNode: src
+           })
+           YIELD index, sourceNode, targetNode, totalCost, nodeIds, costs, path
+           RETURN
+               index, sourceNode, targetNode, totalCost, nodeIds, costs, path
+        ```
+      - Running time: 40-50 minutes
+  - Single-Source Dijkstra enumerating results with grouping aggregation
+    - Command:
+      ```
+      match (src:PERSON {pid: 0})
+           CALL gds.allShortestPaths.dijkstra.stream('init_cn', {
+               sourceNode: src
+           })
+           YIELD index, sourceNode, targetNode, totalCost, nodeIds, costs, path
+           RETURN
+               index,
+               gds.util.asNode(sourceNode).name AS sourceNodeName,
+               gds.util.asNode(targetNode).name AS targetNodeName,
+               totalCost,
+               [nodeId IN nodeIds | gds.util.asNode(nodeId).name] AS nodeNames,
+               costs,
+               nodes(path) as path
+           ORDER BY index
+      ```
+    - Running time: Similar to the previous test
+    - Runtime resources:
+      - Very similar to the previous test.
+    - Note:
+      - Similar to the previous test, the outputs came out immediately.

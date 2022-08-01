@@ -8,14 +8,23 @@
 #   Modify the following parameters when necessary
 NODE_LABEL="PERSON"
 NODE_HEADER="nodes_header.csv"
-NODE_FILE="initial_contact_network_nodes_pure_data.csv"
+NODE_FILE="va_persontrait_epihiper_pure_date.csv"
+#NODE_FILE="wy_persontrait_epihiper_pure_data.csv"
+#NODE_FILE="ny_persontrait_epihiper_pure_data.csv"
+#NODE_FILE="initial_contact_network_nodes_pure_data.csv"
 #NODE_FILE="ca_persontrait_epihiper_pure_date.csv"
 DB_NAME="contacts"
 EDGE_0_LABEL="CONTACT_0"
 EDGE_1_LABEL="CONTACT_1"
 EDGE_HEADER="edges_header.csv"
-EDGE_0_FILE="initial_contact_network_edges_pure_data.csv"
-EDGE_1_FILE="intermediate_network_i_edges_pure_data.csv"
+#EDGE_0_FILE="initial_contact_network_edges_pure_data.csv"
+EDGE_0_FILE="va_contact_network_config_m_5_M_40_a_1000_m-contact_0_with_lid_pure_data.csv"
+#EDGE_0_FILE="wy_contact_network_config_m_5_M_40_a_1000_m-contact_0_with_lid_pure_data.csv"
+#EDGE_0_FILE="ny_contact_network_config_m_5_M_40_a_1000_m-contact_0_with_lid_pure_data.csv"
+#EDGE_1_FILE="intermediate_network_i_edges_pure_data.csv"
+#EDGE_1_FILE="network_30_pure_data"
+#EDGE_1_FILE="network_0_pure_data.csv"
+EDGE_1_FILE="va_contact_network_config_m_5_M_40_a_1000_m-contact_0_with_lid_pure_data.csv"
 #EDGE_0_FILE="ca_contact_network_config_m_5_M_40_a_1000_m-contact_0_with_lid_pure_data.txt"
 #EDGE_1_FILE="ca_contact_network_config_m_5_M_40_a_1000_m-contact_0_with_lid_pure_data.txt"
 
@@ -94,6 +103,7 @@ neo4j-admin import \
 --nodes=${NODE_LABEL}=${NEO4J_DEF_IMPORT}/${NODE_HEADER},${NEO4J_DEF_IMPORT}/${NODE_FILE} \
 --database ${DB_NAME} --normalize-types=false --skip-bad-relationships=true \
 --skip-bad-entries-logging=true --id-type=INTEGER --bad-tolerance=35000000 \
+--high-io=true \
 --relationships=${EDGE_0_LABEL}=${NEO4J_DEF_IMPORT}/${EDGE_HEADER},${NEO4J_DEF_IMPORT}/${EDGE_0_FILE} \
 --relationships=${EDGE_1_LABEL}=${NEO4J_DEF_IMPORT}/${EDGE_HEADER},${NEO4J_DEF_IMPORT}/${EDGE_1_FILE}
 
@@ -103,5 +113,5 @@ neo4j-admin import \
 #--nodes=${NODE_LABEL}=${NEO4J_DEF_IMPORT}/${NODE_HEADER},${NEO4J_DEF_IMPORT}/${NODE_FILE} \
 #--database ${DB_NAME} --normalize-types=false --skip-bad-relationships=true \
 #--skip-bad-entries-logging=true --id-type=INTEGER --bad-tolerance=35000000
-echo "[${LOG_TITLE}] Loading data done."
+#echo "[${LOG_TITLE}] Loading data done."
 
